@@ -4,7 +4,8 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import Backend as be # Import the backend logic
+import full_report as fr
+import backend as be # Import the backend logic
 import warnings
 
 # Suppress warnings for a cleaner output
@@ -13,7 +14,7 @@ warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
 def main():
     """Main function to run the Visualization Bot."""
     st.set_page_config(page_title="Visualization Bot", layout="wide")
-    st.title("📊 Automated Analysis Bot")
+    st.title("Automated Analysis Bot")
 
     # Use session state to store the dataframe
     if 'df' not in st.session_state:
@@ -101,6 +102,26 @@ def main():
             if st.button("Remove Duplicates"):
                 st.session_state.processed_df = be.remove_duplicates(df)
                 st.rerun()
+            
+            # --- Feature Scaling ---
+            st.subheader("4. Feature Scaling")
+            numeric_cols_for_scaling = df.select_dtypes(include=np.number).columns.tolist()
+            
+            if not numeric_cols_for_scaling:
+                st.info("No numeric columns available for scaling.")
+            else:
+                cols_to_scale = st.multiselect("Select numeric columns to scale:", options=numeric_cols_for_scaling, key="scale_cols")
+                scaler_type = st.selectbox("Select scaler type:", ["StandardScaler", "MinMaxScaler"])
+
+                if st.button("Apply Scaling"):
+                    if cols_to_scale:
+                        st.session_state.processed_df = be.scale_features(df, cols_to_scale, scaler_type)
+                        st.rerun()
+                    else:
+                        st.warning("Please select at least one column to scale.")
+
+
+
 
         elif workflow_step == "Data Analysis":
             st.sidebar.header("3. Choose Analysis Type")
@@ -116,18 +137,11 @@ def main():
                     col_name = st.selectbox("Select a numeric column for a detailed report:", numeric_cols)
                     if col_name:
                         if st.button("Generate Report"):
-                            with st.spinner("Generating full insights report..."):
-                                be.generate_insights(df[col_name])
-                                anomaly_report = be.detect_anomalies(df[col_name])
-                                outliers = anomaly_report.get('combined', [])
-                                be.plot_histogram(df, col_name, outliers_to_plot=None, outliers_summary_count=len(outliers)) # Don't plot individual outliers here
-                                be.plot_box_plot(df, col_name)
-                                # Add the new detailed outlier analysis section
-                                be.plot_outlier_analysis(df, col_name, outliers)
+                            fr.generate(df, col_name) # Call the new report generator
 
             elif analysis_type == "Univariate Analysis":
                 be.print_header("Univariate Analysis (Single Variable)")
-                if st.button("🚀 Run Full Univariate Analysis"):
+                if st.button("Run Full Univariate Analysis"):
                     with st.spinner("Running full univariate analysis... This might take a moment."):
                         st.subheader("Analysis of Numeric Columns")
                         numeric_cols = df.select_dtypes(include=np.number).columns

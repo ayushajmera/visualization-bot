@@ -9,6 +9,8 @@ import seaborn as sns
 import plotly.express as px
 from scipy import stats
 from sklearn.ensemble import IsolationForest
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import io
 import warnings
 
 # Suppress warnings for a cleaner output
@@ -31,7 +33,7 @@ def load_dataset(uploaded_file) -> pd.DataFrame | None:
         if file_extension in ['csv', 'txt']:
             df = pd.read_csv(uploaded_file)
         elif file_extension in ['xlsx', 'xls']:
-            df = pd.read_excel(uploaded_file)
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
         elif file_extension == 'json':
             df = pd.read_json(uploaded_file)
         else:
@@ -134,26 +136,27 @@ def detect_anomalies(series: pd.Series) -> dict:
     return outliers
 
 def save_and_show_plot(key_suffix: str):
-    """Saves the current plot to a file and displays it."""
-    output_filename = f"output_{key_suffix}.png"
+    """Displays the current plot and provides a download button without saving to disk."""
+    # Display the plot in Streamlit
+    st.pyplot(plt.gcf())
+
+    # Save plot to an in-memory buffer
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png")
+    buf.seek(0)
+
     try:
-        # Save the plot
-        plt.savefig(output_filename)
-        st.pyplot(plt.gcf()) # Display in Streamlit
-        st.success(f"✅ Plot saved as '{output_filename}'")
-        
         # Add a download button for the image
-        with open(output_filename, "rb") as file:
-            st.download_button(
-                label="Download Plot",
-                data=file,
-                file_name=output_filename,
-                mime="image/png",
-                key=f"download_{key_suffix}"
-            )
+        st.download_button(
+            label="Download Plot",
+            data=buf,
+            file_name=f"output_{key_suffix}.png",
+            mime="image/png",
+            key=f"download_{key_suffix}"
+        )
         plt.clf() # Clear the figure for the next plot
     except Exception as e:
-        st.error(f"❌ Error saving or showing plot: {e}")
+        st.error(f"❌ Error creating download button: {e}")
 
 def plot_histogram(df: pd.DataFrame, column: str, outliers_to_plot: list | None = None, outliers_summary_count: int = 0):
     """Generates and saves a histogram, highlighting outliers if provided."""
@@ -411,6 +414,25 @@ def drop_columns(df: pd.DataFrame, columns_to_drop: list) -> pd.DataFrame:
     st.success(f"Dropped columns: {', '.join(columns_to_drop)}.")
     return df_processed
 
+def scale_features(df: pd.DataFrame, columns_to_scale: list, scaler_type: str) -> pd.DataFrame:
+    """Scales selected numeric features using StandardScaler or MinMaxScaler."""
+    df_processed = df.copy()
+    
+    if not columns_to_scale:
+        st.warning("Please select at least one column to scale.")
+        return df_processed
+
+    if scaler_type == "StandardScaler":
+        scaler = StandardScaler()
+        df_processed[columns_to_scale] = scaler.fit_transform(df_processed[columns_to_scale])
+        st.success(f"Applied StandardScaler to columns: {', '.join(columns_to_scale)}.")
+    elif scaler_type == "MinMaxScaler":
+        scaler = MinMaxScaler()
+        df_processed[columns_to_scale] = scaler.fit_transform(df_processed[columns_to_scale])
+        st.success(f"Applied MinMaxScaler to columns: {', '.join(columns_to_scale)}.")
+    
+    return df_processed
+
 def plot_3d_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str, z_col: str, color_col: str | None = None):
     """Generates an interactive 3D scatter plot."""
     print_header(f"Generating 3D Scatter Plot: '{x_col}' vs '{y_col}' vs '{z_col}'")
@@ -442,7 +464,7 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
     if not outliers:
         return
 
-    with st.expander("🔍 Detailed Outlier Analysis (Highlighted Pair Plot)"):
+    with st.expander("Detailed Outlier Analysis (Highlighted Pair Plot)"):
         
         # Create a temporary dataframe for plotting
         plot_df = df.copy()
@@ -450,7 +472,7 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
         plot_df['is_outlier'] = plot_df[column].isin(outliers).map({True: 'Outlier', False: 'Normal'})
         
         st.markdown("---")
-        st.markdown("### ✅ **What the Pair Plot Is Showing**")
+        st.markdown("### ✅ What the Pair Plot Is Showing")
         st.markdown(f"""
         You have a **pair plot** (scatterplot matrix) where:
         - **<span style='color:red;'>Red points</span> = Outliers** (specifically: the **{len(outliers)} outliers** detected in the **`{column}`** column.)
@@ -510,22 +532,22 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
                         else:
                             interpretation_details.append(f"- For **`{col_to_compare}`**, outliers tend to have **lower values** (mean: {outlier_mean:.2f} vs normal mean: {normal_mean:.2f}).")
             
-            st.markdown("### 🧐 **How to interpret YOUR specific plot**")
+            st.markdown("### How to interpret YOUR specific plot")
             if behavioral_outlier_found:
                 st.markdown("""
                 Based on the analysis of the generated plot and statistical comparison:
                 - ✔ The red points (outliers) show **distinct patterns or tendencies** when compared to the blue points (normal data) across some variables.
                 - ✔ This suggests that these outliers might represent a **meaningful subgroup** or a special type of user/event.
                 """)
-                st.markdown("### 🎯 **Interpretation**")
+                st.markdown("### Interpretation")
                 st.markdown(f"""
-                - 🔹 The outliers in **`{column}`** appear to be **behavioral outliers**, indicating they are part of a potentially distinct group.
-                - 🔹 Their unusual behavior is reflected in:
+                - The outliers in **`{column}`** appear to be **behavioral outliers**, indicating they are part of a potentially distinct group.
+                - Their unusual behavior is reflected in:
                 """)
                 for detail in interpretation_details:
                     st.markdown(detail)
                 st.markdown("""
-                - 🔹 Further investigation into these specific characteristics could reveal valuable insights.
+                - Further investigation into these specific characteristics could reveal valuable insights.
                 """)
             else:
                 st.markdown(f"""
@@ -536,48 +558,58 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
                 - ✔ KDE curves (the top diagonal) show no distinct second peak for outliers.
 
                 This means:
-                ### 🎯 **Interpretation**
-                - 🔹 The outliers in **`{column}`** are *not a separate user group* based on their relationship with other numeric variables.
-                - 🔹 They don't behave significantly differently in the other plotted variables.
-                - 🔹 They seem to be **statistical outliers only**, not behavioral outliers.
+                ### Interpretation
+                - The outliers in **`{column}`** are *not a separate user group* based on their relationship with other numeric variables.
+                - They don't behave significantly differently in the other plotted variables.
+                - They seem to be **statistical outliers only**, not behavioral outliers.
 
                 In simple words: **The outliers don’t form a special pattern. They’re just extreme values, not a different type of user.**
                 """, unsafe_allow_html=True)
         else:
-            st.markdown("### 🧐 **How to interpret YOUR specific plot**")
+            st.markdown("### How to interpret YOUR specific plot")
             st.markdown("Not enough data points (either outliers or normal data) to perform a comparative interpretation.")
 
 
         st.markdown("---")
 
-        st.markdown("### 🧠 **What this visualization helps you understand**")
+        st.markdown("### What this visualization helps you understand")
         st.markdown(f"""
         The purpose of this pair plot is to answer **one key question**:
-        ### 👉 *“Do the outliers behave differently from normal data?”*
+        ### *“Do the outliers behave differently from normal data?”*
 
         If the red points (outliers) form **clusters**, **patterns**, or **separate shapes**, it means:
-        - 🔸 There's likely a meaningful subgroup or hidden segment
-        - 🔸 The outliers may not be “errors” but represent a special type of user
-        - 🔸 Their unusual behavior might be systematic and worth analyzing
+        - There's likely a meaningful subgroup or hidden segment
+        - The outliers may not be “errors” but represent a special type of user
+        - Their unusual behavior might be systematic and worth analyzing
 
         If the red points **do NOT form clusters**, and instead are spread randomly:
-        - 🔸 The outliers are probably statistical noise
-        - 🔸 They don’t represent a distinct group
-        - 🔸 They may just be extreme values of normal users
+        - The outliers are probably statistical noise
+        - They don’t represent a distinct group
+        - They may just be extreme values of normal users
         """)
         st.markdown("---")
 
-        st.markdown("### 📦 **Why does this matter?**")
-        st.markdown("""
-        Because it affects how you treat those outliers:
-        - ✔ If they formed a cluster → keep them; they represent a meaningful subgroup
-        - ❌ If they don’t (your case) → you can safely remove or cap them
+        st.markdown("### Why does this matter?")
+        if behavioral_outlier_found:
+            st.markdown("""
+            Because it affects how you treat those outliers:
+            - ✔ **If they formed a cluster (your case) → keep them; they represent a meaningful subgroup.**
+            - ❌ If they don’t → you can safely remove or cap them
 
-        This improves:
-        - Model accuracy
-        - Distribution normality
-        - Statistical interpretations
-        """)
+            This improves:
+            - Model accuracy
+            - Distribution normality
+            - Statistical interpretations
+            """)
+        else:
+            st.markdown("""
+            Because it affects how you treat those outliers:
+            - ✔ If they formed a cluster → keep them; they represent a meaningful subgroup
+            - ❌ **If they don’t (your case) → you can safely remove or cap them.**
+
+            This improves:
+            - Model accuracy
+            - Distribution normality
+            - Statistical interpretations
+            """)
         st.markdown("---")
-
-
