@@ -1,8 +1,15 @@
 # streamlit_app.py
 # UI layer for the Visualization Bot.
 
+import sys
+import os
 import streamlit as st
 import pandas as pd
+
+# Add the project root to the Python path
+# This ensures that 'backend' and 'full_report' can be imported by any module.
+sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
+
 import numpy as np
 import full_report as fr
 import backend as be # Import the backend logic
