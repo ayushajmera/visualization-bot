@@ -36,8 +36,12 @@ def main():
     if st.session_state.processed_df is not None:
         df = st.session_state.processed_df
         st.sidebar.header("Workflow")
-        
-        workflow_step = st.sidebar.radio("Choose a step:", 
+
+        # Add a key and an on_change callback to reset analysis type
+        def reset_analysis_type():
+            st.session_state.analysis_type = "Select an option"
+
+        workflow_step = st.sidebar.radio("Choose a step:",
                                          ["Data Preprocessing", "Data Analysis"])
 
         if workflow_step == "Data Preprocessing":
@@ -125,8 +129,10 @@ def main():
 
         elif workflow_step == "Data Analysis":
             st.sidebar.header("3. Choose Analysis Type")
-            analysis_type = st.sidebar.radio("Select Analysis", 
-                                             ["Select an option", "Full Insights Report", "Univariate Analysis", "Multivariate Analysis", "Temporal Analysis"])
+            analysis_type = st.sidebar.radio("Select Analysis",
+                                             ["Select an option", "Full Insights Report", "Univariate Analysis", "Multivariate Analysis", "Temporal Analysis"],
+                                             key="analysis_type",
+                                             index=0) # Default to "Select an option"
 
             if analysis_type == "Full Insights Report":
                 be.print_header("Full Insights & Anomaly Report")

@@ -33,7 +33,7 @@ def load_dataset(uploaded_file) -> pd.DataFrame | None:
         if file_extension in ['csv', 'txt']:
             df = pd.read_csv(uploaded_file)
         elif file_extension in ['xlsx', 'xls']:
-            df = pd.read_excel(uploaded_file, engine='openpyxl')
+            df = pd.read_excel(uploaded_file, engine=None) # Let pandas auto-detect
         elif file_extension == 'json':
             df = pd.read_json(uploaded_file)
         else:

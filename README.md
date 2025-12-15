@@ -58,6 +58,26 @@ A powerful set of tools to explore and visualize your cleaned data.
 
 The application will open in your default web browser.
 
+## Deployment to Streamlit Community Cloud
+
+This application can be easily deployed for free using Streamlit Community Cloud.
+
+1.  **Push your project to a public GitHub repository.**
+    Make sure your repository includes all project files:
+    - `streamlit_app.py` (your main app file)
+    - `backend.py` and `full_report.py`
+    - `requirements.txt` (listing all dependencies)
+
+2.  **Sign up for Streamlit Community Cloud:**
+    - Go to share.streamlit.io and sign up using your GitHub account.
+
+3.  **Deploy the app:**
+    - From your workspace, click the "**New app**" button.
+    - Select the repository, branch (e.g., `main`), and set the "**Main file path**" to `streamlit_app.py`.
+    - Click "**Deploy!**".
+
+Streamlit will then build and deploy your application, making it accessible via a public URL.
+
 ## File Structure
 
 The project is organized into a modular structure for clarity and maintainability:
