@@ -150,7 +150,7 @@ def main():
                     col_name = st.selectbox("Select a numeric column for a detailed report:", numeric_cols)
                     if col_name:
                         if st.button("Generate Report"):
-                            fr.generate(df, col_name) # Call the new report generator
+                            fr.generate(df, col_name, be) # Pass the backend module
 
             elif analysis_type == "Univariate Analysis":
                 be.print_header("Univariate Analysis (Single Variable)")

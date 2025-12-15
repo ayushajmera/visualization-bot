@@ -2,9 +2,8 @@
 # Handles the generation of the "Full Insights Report".
 
 import streamlit as st
-import backend as be
 
-def generate(df, col_name):
+def generate(df, col_name, be):
     """
     Generates a complete insights report for a given column,
     including statistics, anomaly detection, and visualizations.
@@ -12,6 +11,7 @@ def generate(df, col_name):
     Args:
         df (pd.DataFrame): The dataframe containing the data.
         col_name (str): The name of the column to analyze.
+        be (module): The backend module containing helper functions.
     """
     with st.spinner("Generating full insights report..."):
         be.print_header("Full Insights & Anomaly Report")
