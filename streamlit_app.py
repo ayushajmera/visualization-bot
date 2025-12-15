@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 import numpy as np
 import full_report as fr
-import backend as be # Import the backend logic
+import Backend as be # Import the backend logic
 import warnings
 
 # Suppress warnings for a cleaner output
