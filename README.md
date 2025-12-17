@@ -81,20 +81,4 @@ A powerful set of tools to explore and visualize your cleaned data.
 
 The application will open in your default web browser.
 
-## File Structure
-
-The project is organized into a modular structure for clarity and maintainability:
-
-- **`streamlit_app.py`**: The main entry point and UI layer. It controls the sidebar, workflow selection, and calls the appropriate modules.
-- **`one_click_analyst.py`**: Orchestrates the "One-Click Data Analyst" workflow by calling various analysis modules in sequence.
-- **`Backend.py`**: A reusable "toolbox" containing all the core, low-level functions for data manipulation (e.g., `load_dataset`), plotting (e.g., `plot_histogram`), and calculations (e.g., `scale_features`).
-- **Analysis Modules**: Each file focuses on a specific part of the analysis.
-    - `data_audit.py`: Performs data quality checks.
-    - `automated_insights.py`: Generates text-based summaries.
-    - `automated_cleaning.py`: Provides cleaning suggestions.
-    - `exploratory_data_analysis.py`: Manages the generation of EDA plots.
-    - `time_series_analysis.py`: Handles automated temporal analysis.
-    - `full_report.py`: Manages the detailed, single-column insights report.
-- **`requirements.txt`**: A list of all Python libraries required to run the project.
-
----
+## 

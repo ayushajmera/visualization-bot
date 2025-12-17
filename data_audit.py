@@ -50,7 +50,7 @@ def perform_audit(df, be):
     st.markdown("This report checks the dataset for common quality issues to ensure its trustworthiness before analysis.")
 
     # --- 1. Missing Values ---
-    with st.expander("✅ Missing Values Analysis", expanded=True):
+    with st.expander("Missing Values Analysis", expanded=True):
         st.markdown("#### Which columns have missing data?")
         missing_summary = df.isnull().sum()
         missing_summary = missing_summary[missing_summary > 0]
@@ -71,7 +71,7 @@ def perform_audit(df, be):
             st.pyplot(fig)
 
     # --- 2. Duplicates ---
-    with st.expander("✅ Duplicate Data Analysis", expanded=True):
+    with st.expander("Duplicate Data Analysis", expanded=True):
         st.markdown("#### Are there duplicate rows?")
         num_duplicates = df.duplicated().sum()
         if num_duplicates > 0:
@@ -97,7 +97,7 @@ def perform_audit(df, be):
             st.info("No obvious ID column was automatically detected to check for duplicate IDs.")
 
     # --- 3. Invalid Values ---
-    with st.expander("✅ Invalid & Out-of-Range Value Analysis", expanded=True):
+    with st.expander("Invalid & Out-of-Range Value Analysis", expanded=True):
         st.markdown("""
         **Outlier Detection using the IQR Method**
         
@@ -140,7 +140,7 @@ def perform_audit(df, be):
             st.success(f"Successfully parsed potential date column **`{time_col}`**.")
 
     # --- 4. Consistency ---
-    with st.expander("✅ Data Consistency Checks", expanded=True):
+    with st.expander("Data Consistency Checks", expanded=True):
         st.markdown("#### Are category names consistent?")
         categorical_cols = df.select_dtypes(include=['object', 'category']).columns
         if len(categorical_cols) > 0:

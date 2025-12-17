@@ -37,10 +37,10 @@ def load_dataset(uploaded_file) -> pd.DataFrame | None:
         elif file_extension == 'json':
             df = pd.read_json(uploaded_file)
         else:
-            st.error(f"❌ Error: Unsupported file format '{file_extension}'. Please use CSV, Excel, or JSON.")
+            st.error(f"Error: Unsupported file format '{file_extension}'. Please use CSV, Excel, or JSON.")
             return None
 
-        st.success("✅ Dataset loaded successfully!")
+        st.success("Dataset loaded successfully!")
         st.write("--- Dataset Shape ---")
         st.write(f"Rows: {df.shape[0]}, Columns: {df.shape[1]}")
         
@@ -50,8 +50,7 @@ def load_dataset(uploaded_file) -> pd.DataFrame | None:
         return df
 
     except Exception as e:
-        st.error(f"❌ Error loading dataset: {e}")
-        return None
+        st.error(f"Error loading dataset: {e}")
 
 def generate_insights(series: pd.Series):
     """Generates and prints a full statistical analysis report for a numeric column."""
@@ -429,7 +428,7 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
         plot_df['is_outlier'] = plot_df[column].isin(outliers).map({True: 'Outlier', False: 'Normal'})
         
         st.markdown("---")
-        st.markdown("### ✅ What the Pair Plot Is Showing")
+        st.markdown("### What the Pair Plot Is Showing")
         st.markdown(f"""
         You have a **pair plot** (scatterplot matrix) where:
         - **<span style='color:red;'>Red points</span> = Outliers** (specifically: the **{len(outliers)} outliers** detected in the **`{column}`** column.)
@@ -493,8 +492,8 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
             if behavioral_outlier_found:
                 st.markdown("""
                 Based on the analysis of the generated plot and statistical comparison:
-                - ✔ The red points (outliers) show **distinct patterns or tendencies** when compared to the blue points (normal data) across some variables.
-                - ✔ This suggests that these outliers might represent a **meaningful subgroup** or a special type of user/event.
+                - The red points (outliers) show **distinct patterns or tendencies** when compared to the blue points (normal data) across some variables.
+                - This suggests that these outliers might represent a **meaningful subgroup** or a special type of user/event.
                 """)
                 st.markdown("### Interpretation")
                 st.markdown(f"""
@@ -509,10 +508,10 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
             else:
                 st.markdown(f"""
                 Based on the analysis of the generated plot:
-                - ✔ Almost all red points are mixed uniformly with the blue points.
-                - ✔ There is **no clear cluster**, no separate region, no special trend.
-                - ✔ In every scatter cell, red + blue overlap heavily.
-                - ✔ KDE curves (the top diagonal) show no distinct second peak for outliers.
+                - Almost all red points are mixed uniformly with the blue points.
+                - There is **no clear cluster**, no separate region, no special trend.
+                - In every scatter cell, red + blue overlap heavily.
+                - KDE curves (the top diagonal) show no distinct second peak for outliers.
 
                 This means:
                 ### Interpretation
@@ -550,8 +549,8 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
         if behavioral_outlier_found:
             st.markdown("""
             Because it affects how you treat those outliers:
-            - ✔ **If they formed a cluster (your case) → keep them; they represent a meaningful subgroup.**
-            - ❌ If they don’t → you can safely remove or cap them
+            - If they formed a cluster (your case) → keep them; they represent a meaningful subgroup.
+            - If they don’t → you can safely remove or cap them
 
             This improves:
             - Model accuracy
@@ -561,8 +560,8 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
         else:
             st.markdown("""
             Because it affects how you treat those outliers:
-            - ✔ If they formed a cluster → keep them; they represent a meaningful subgroup
-            - ❌ **If they don’t (your case) → you can safely remove or cap them.**
+            - If they formed a cluster → keep them; they represent a meaningful subgroup
+            - If they don’t (your case) → you can safely remove or cap them.
 
             This improves:
             - Model accuracy
@@ -576,7 +575,7 @@ def correct_data_type(df: pd.DataFrame, column: str, target_type: str) -> pd.Dat
     df_processed = df.copy()
     
     if column not in df_processed.columns:
-        st.error(f"❌ Column '{column}' not found in the DataFrame.")
+        st.error(f"Column '{column}' not found in the DataFrame.")
         return df # Return original df
 
     st.write(f"Attempting to convert column **`{column}`** to **`{target_type}`**...")
@@ -596,13 +595,13 @@ def correct_data_type(df: pd.DataFrame, column: str, target_type: str) -> pd.Dat
             st.error(f"Unsupported target type '{target_type}'.")
             return df # Return original df
 
-        st.success(f"✅ Successfully converted '{column}' to {target_type}.")
+        st.success(f"Successfully converted '{column}' to {target_type}.")
         new_nulls = df_processed[column].isnull().sum()
         if new_nulls > original_nulls:
             st.warning(f"{new_nulls - original_nulls} values could not be converted and were set to null (NaN/NaT).")
 
     except Exception as e:
-        st.error(f"❌ An error occurred during conversion of column '{column}': {e}")
+        st.error(f"An error occurred during conversion of column '{column}': {e}")
         return df # Return original df on failure
 
     return df_processed
@@ -613,14 +612,14 @@ def standardize_categories(df: pd.DataFrame, column: str, values_to_merge: list,
     df_processed = df.copy()
     
     if column not in df_processed.columns:
-        st.error(f"❌ Column '{column}' not found.")
+        st.error(f"Column '{column}' not found.")
         return df
 
     try:
         df_processed[column] = df_processed[column].replace(values_to_merge, new_value)
-        st.success(f"✅ Standardized {len(values_to_merge)} categories into '{new_value}' in column '{column}'.")
+        st.success(f"Standardized {len(values_to_merge)} categories into '{new_value}' in column '{column}'.")
     except Exception as e:
-        st.error(f"❌ An error occurred during standardization: {e}")
+        st.error(f"An error occurred during standardization: {e}")
         return df
 
     return df_processed
@@ -631,7 +630,7 @@ def create_derived_column_numeric(df: pd.DataFrame, col_a: str, operation: str, 
     df_processed = df.copy()
 
     if new_col_name in df_processed.columns:
-        st.error(f"❌ Column '{new_col_name}' already exists. Please choose a different name.")
+        st.error(f"Column '{new_col_name}' already exists. Please choose a different name.")
         return df
 
     try:
@@ -645,9 +644,9 @@ def create_derived_column_numeric(df: pd.DataFrame, col_a: str, operation: str, 
             # Add a small epsilon to avoid division by zero
             df_processed[new_col_name] = df_processed[col_a] / (df_processed[col_b] + 1e-9)
         
-        st.success(f"✅ Created new column '{new_col_name}' as `{col_a} {operation} {col_b}`.")
+        st.success(f"Created new column '{new_col_name}' as `{col_a} {operation} {col_b}`.")
     except Exception as e:
-        st.error(f"❌ An error occurred while creating the derived column: {e}")
+        st.error(f"An error occurred while creating the derived column: {e}")
         return df
 
     return df_processed
@@ -678,9 +677,9 @@ def create_derived_column_datetime(df: pd.DataFrame, time_col: str, parts_to_ext
             elif part == "Week of Year":
                 df_processed[new_col_name] = datetime_series.dt.isocalendar().week
         
-        st.success(f"✅ Extracted {', '.join(parts_to_extract)} from '{time_col}'.")
+        st.success(f"Extracted {', '.join(parts_to_extract)} from '{time_col}'.")
     except Exception as e:
-        st.error(f"❌ An error occurred while extracting datetime parts: {e}")
+        st.error(f"An error occurred while extracting datetime parts: {e}")
         return df
 
     return df_processed
@@ -691,14 +690,14 @@ def create_binned_column(df: pd.DataFrame, col_to_bin: str, num_bins: int, new_c
     df_processed = df.copy()
     
     if new_col_name in df_processed.columns:
-        st.error(f"❌ Column '{new_col_name}' already exists. Please choose a different name.")
+        st.error(f"Column '{new_col_name}' already exists. Please choose a different name.")
         return df
 
     try:
         df_processed[new_col_name] = pd.cut(df_processed[col_to_bin], bins=num_bins, labels=False, include_lowest=True)
-        st.success(f"✅ Created binned column '{new_col_name}' from '{col_to_bin}' with {num_bins} bins.")
+        st.success(f"Created binned column '{new_col_name}' from '{col_to_bin}' with {num_bins} bins.")
     except Exception as e:
-        st.error(f"❌ An error occurred during binning: {e}")
+        st.error(f"An error occurred during binning: {e}")
         return df
 
     return df_processed

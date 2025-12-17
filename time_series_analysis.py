@@ -74,12 +74,12 @@ def perform_time_series_analysis(df, be):
         return
 
     # --- 1. Overall Trend ---
-    with st.expander("📈 Overall Trend Analysis"):
+    with st.expander("Overall Trend Analysis"):
         st.write(f"The plot below shows the overall trend of **`{value_col}`** over time.")
         be.plot_time_series(ts_daily.reset_index(), time_col, value_col)
 
     # --- 2. Seasonality Decomposition ---
-    with st.expander("🌀 Seasonality and Trend Decomposition"):
+    with st.expander("Seasonality and Trend Decomposition"):
         st.write("This analysis separates the time series into three components: the overall trend, seasonal patterns, and residuals (noise).")
         # The period for seasonality can be tricky. We assume weekly (7) if data spans more than 2 weeks.
         period = 7 if (ts_daily.index.max() - ts_daily.index.min()).days > 14 else None
@@ -104,7 +104,7 @@ def perform_time_series_analysis(df, be):
             st.info("Not enough data to determine a seasonal period for decomposition.")
 
     # --- 3. Monthly and Weekly Patterns ---
-    with st.expander("📅 Monthly & Weekly Patterns"):
+    with st.expander("Monthly & Weekly Patterns"):
         st.write("These plots show the average value for each month and day of the week, helping to identify peak and low periods.")
         
         # Monthly
