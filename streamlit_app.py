@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 import numpy as np
 import full_report as fr
-import backend as be # Import the backend logic
+import Backend as be # Import the backend logic
 import one_click_analyst as oca # Import the new feature module
 import automated_insights as ai # Import the new insights module
 import automated_cleaning as ac # Import the cleaning suggestions module
