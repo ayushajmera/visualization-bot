@@ -135,44 +135,14 @@ def detect_anomalies(series: pd.Series) -> dict:
     
     return outliers
 
-def save_and_show_plot(key_suffix: str):
-    """Displays the current plot and provides a download button without saving to disk."""
-    # Display the plot in Streamlit
-    st.pyplot(plt.gcf())
-
-    # Save plot to an in-memory buffer
-    buf = io.BytesIO()
-    plt.savefig(buf, format="png")
-    buf.seek(0)
-
-    try:
-        # Add a download button for the image
-        st.download_button(
-            label="Download Plot",
-            data=buf,
-            file_name=f"output_{key_suffix}.png",
-            mime="image/png",
-            key=f"download_{key_suffix}"
-        )
-        plt.clf() # Clear the figure for the next plot
-    except Exception as e:
-        st.error(f"❌ Error creating download button: {e}")
-
-def plot_histogram(df: pd.DataFrame, column: str, outliers_to_plot: list | None = None, outliers_summary_count: int = 0):
+@st.cache_resource(show_spinner="Generating histogram...")
+def plot_histogram(df: pd.DataFrame, column: str):
     """Generates and saves a histogram, highlighting outliers if provided."""
-    print_header(f"Generating Histogram for '{column}'")
-    plt.figure(figsize=(12, 7))
-    sns.histplot(df[column], kde=True, bins=30)
+    # Explicitly create a figure and axes object
+    fig, ax = plt.subplots(figsize=(12, 7))
+    sns.histplot(df[column], kde=True, bins=30, ax=ax)
     
-    if outliers_to_plot: # Only plot individual lines if a list of outliers is explicitly provided
-        for outlier in outliers_to_plot:
-            plt.axvline(x=outlier, color='r', linestyle='--', label=f'Outlier: {outlier:.2f}')
-        # Create a legend with unique labels
-        handles, labels = plt.gca().get_legend_handles_labels()
-        by_label = dict(zip(labels, handles))
-        plt.legend(by_label.values(), by_label.keys())
-
-    plt.title(f'Histogram of {column}', fontsize=16)
+    ax.set_title(f'Histogram of {column}', fontsize=16)
     plt.xlabel(column, fontsize=12)
     plt.ylabel('Frequency', fontsize=12)
     plt.grid(axis='y', alpha=0.5)
@@ -186,51 +156,38 @@ def plot_histogram(df: pd.DataFrame, column: str, outliers_to_plot: list | None 
     else:
         skew_interp = "Fairly symmetrical."
     st.write(f"**Skewness Interpretation:** {skew_interp}")
+    
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    plt.close(fig)
+    return fig, buf
 
-    st.subheader("What this graph shows:")
-    st.markdown(f"""
-    - This histogram shows the frequency distribution of the **`{column}`** variable.
-    - {skew_interp}
-    - The Kernel Density Estimate (KDE) line provides a smooth estimate of the data's distribution.
-    """)
-    if outliers_summary_count > 0:
-        st.markdown(f"""
-    - **{outliers_summary_count} potential outliers** were detected. Please refer to the accompanying box plot for their visual representation.
-    """)
-    save_and_show_plot(key_suffix=f"hist_{column}")
-
+@st.cache_resource(show_spinner="Generating bar chart...")
 def plot_bar_chart(df: pd.DataFrame, column: str): 
     """Generates and saves a bar chart for a categorical column."""
-    print_header(f"Generating Bar Chart for '{column}'")
-    plt.figure(figsize=(12, 7))
+    fig, ax = plt.subplots(figsize=(12, 7))
     
     # Use value_counts and plot for better control, especially with many categories
     counts = df[column].value_counts().nlargest(20) # Limit to top 20 for readability
-    sns.barplot(x=counts.index, y=counts.values)
+    sns.barplot(x=counts.index, y=counts.values, ax=ax)
 
-    plt.title(f'Bar Chart of {column}', fontsize=16)
+    ax.set_title(f'Bar Chart of {column}', fontsize=16)
     plt.xlabel(column, fontsize=12)
     plt.ylabel('Count', fontsize=12)
-    plt.xticks(rotation=45, ha='right')
+    ax.tick_params(axis='x', rotation=45)
     plt.tight_layout() # Adjust plot to prevent labels from overlapping
     
-    # Add description and conclusion
-    most_frequent = counts.index[0]
-    least_frequent = counts.index[-1]
-    
-    st.subheader("What this graph shows:")
-    st.markdown(f"""
-    - This bar chart displays the frequency of each category in the **`{column}`** variable (showing the top {len(counts)} categories).
-    - The most frequent category is **'{most_frequent}'** with {counts.iloc[0]} occurrences.
-    - The least frequent category shown is **'{least_frequent}'** with {counts.iloc[-1]} occurrences.
-    - This helps in understanding the prevalence of different categories in your dataset.
-    """)
-    save_and_show_plot(key_suffix=f"bar_{column}")
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    plt.close(fig)
+    return fig, buf
 
+@st.cache_resource(show_spinner="Generating pie chart...")
 def plot_pie_chart(df: pd.DataFrame, column: str):
     """Generates and saves a pie chart for a categorical column."""
-    print_header(f"Generating Pie Chart for '{column}'")
-    plt.figure(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(10, 10))
     
     counts = df[column].value_counts()
     # Group small slices into 'Other' for clarity
@@ -241,78 +198,58 @@ def plot_pie_chart(df: pd.DataFrame, column: str):
         if other > 0:
             counts['Other'] = other
 
-    plt.pie(counts, labels=counts.index, autopct='%1.1f%%', startangle=140, wedgeprops={'edgecolor': 'white'})
-    plt.title(f'Pie Chart of {column}', fontsize=16)
+    ax.pie(counts, labels=counts.index, autopct='%1.1f%%', startangle=140, wedgeprops={'edgecolor': 'white'})
+    ax.set_title(f'Pie Chart of {column}', fontsize=16)
     plt.ylabel('') # Hide the y-label which is often the column name
     
-    # Add description and conclusion
-    largest_slice = counts.index[0]
-    largest_percentage = (counts.iloc[0] / counts.sum()) * 100
-    
-    st.subheader("What this graph shows:")
-    st.markdown(f"""
-    - This pie chart illustrates the proportional distribution of categories in the **`{column}`** variable.
-    - The largest slice belongs to **'{largest_slice}'**, accounting for **{largest_percentage:.1f}%** of the total.
-    - If an 'Other' slice is present, it groups together smaller categories for better readability.
-    - This is useful for seeing the relative share of each category at a glance.
-    """)
-    save_and_show_plot(key_suffix=f"pie_{column}")
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    plt.close(fig)
+    return fig, buf
 
+@st.cache_resource(show_spinner="Generating box plot...")
 def plot_box_plot(df: pd.DataFrame, column: str):
     """Generates and saves a box plot for a numeric column."""
-    print_header(f"Generating Box Plot for '{column}'")
-    plt.figure(figsize=(12, 7))
-    sns.boxplot(x=df[column])
-    plt.title(f'Box Plot of {column}', fontsize=16)
+    fig, ax = plt.subplots(figsize=(12, 7))
+    sns.boxplot(x=df[column], ax=ax)
+    ax.set_title(f'Box Plot of {column}', fontsize=16)
     plt.xlabel(column, fontsize=12)
     plt.grid(axis='x', alpha=0.5)
     
     # Add description and conclusion
-    q1 = df[column].quantile(0.25)
-    median = df[column].median()
-    q3 = df[column].quantile(0.75)
-    
-    st.subheader("What this graph shows:")
-    st.markdown(f"""
-    - This box plot summarizes the distribution of the **`{column}`** variable.
-    - The box represents the Interquartile Range (IQR), with the left edge at the 25th percentile (Q1: {q1:.2f}) and the right edge at the 75th percentile (Q3: {q3:.2f}).
-    - The vertical line inside the box is the **median** (50th percentile): **{median:.2f}**.
-    - The 'whiskers' extend to show the range of the data, typically 1.5 times the IQR. Points outside the whiskers are often considered potential outliers.
-    """)
-    save_and_show_plot(key_suffix=f"box_{column}")
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    plt.close(fig)
+    return fig, buf
 
+@st.cache_resource(show_spinner="Generating correlation heatmap...")
 def plot_correlation_heatmap(df: pd.DataFrame):
     """Calculates and plots the correlation heatmap for numeric columns."""
-    print_header("Generating Correlation Heatmap")
     numeric_df = df.select_dtypes(include=np.number)
     if numeric_df.shape[1] < 2:
         st.warning("Not enough numeric columns (at least 2 required) to generate a correlation heatmap.")
-        return
+        return None, None # Return None for both figure and buffer
     
     corr = numeric_df.corr()
-    plt.figure(figsize=(14, 10))
+    fig = plt.figure(figsize=(14, 10)) # Explicitly create the figure
     sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", linewidths=.5)
     plt.title('Correlation Heatmap of Numeric Columns', fontsize=16)
     plt.xticks(rotation=45, ha='right')
     plt.yticks(rotation=0)
     plt.tight_layout()
     
-    # Add description and conclusion
-    st.subheader("What this graph shows:")
-    st.markdown("""
-    - This heatmap visualizes the correlation matrix for all numeric columns in the dataset.
-    - **Correlation** measures the linear relationship between two variables, ranging from -1 to +1.
-    - **Warm colors (e.g., red)** indicate a **strong positive correlation** (as one variable increases, the other tends to increase).
-    - **Cool colors (e.g., blue)** indicate a **strong negative correlation** (as one variable increases, the other tends to decrease).
-    - **Colors near zero (neutral)** indicate a **weak or no linear correlation**.
-    - The diagonal is always 1.0 because a variable is perfectly correlated with itself.
-    - This is crucial for identifying multicollinearity and understanding relationships between variables.
-    """)
-    save_and_show_plot(key_suffix="heatmap")
+    # Save the explicitly created figure to buffer
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    plt.close(fig)
+    return fig, buf
 
+@st.cache_data(show_spinner="Generating scatter plot...")
 def plot_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str):
     """Generates an interactive scatter plot for two numeric columns."""
-    print_header(f"Generating Scatter Plot: '{x_col}' vs '{y_col}'")
     fig = px.scatter(df, x=x_col, y=y_col, title=f'Scatter Plot: {y_col} vs. {x_col}',
                      trendline="ols", trendline_color_override="red")
     
@@ -325,15 +262,15 @@ def plot_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str):
     - The **red line** is a **trendline** (calculated using Ordinary Least Squares regression), which shows the general direction of the relationship.
     - Hover over points to see their exact values.
     """)
-    st.plotly_chart(fig, use_container_width=True)
+    return fig
 
+@st.cache_resource(show_spinner="Generating pair plot...")
 def plot_pair_plot(df: pd.DataFrame):
     """Generates a pair plot for numeric columns."""
-    print_header("Generating Pair Plot")
     numeric_df = df.select_dtypes(include=np.number)
     if numeric_df.shape[1] < 2:
         st.warning("Not enough numeric columns (at least 2 required) for a pair plot.")
-        return
+        return None
     if numeric_df.shape[1] > 5:
         st.warning("Pair plot is limited to 5 numeric columns for performance. Using the first 5.")
         numeric_df = numeric_df.iloc[:, :5]
@@ -341,16 +278,34 @@ def plot_pair_plot(df: pd.DataFrame):
     st.info("Generating pair plot... this may take a moment.")
     fig = sns.pairplot(numeric_df, diag_kind='kde')
     
-    # Add description and conclusion
-    st.subheader("What this graph shows:")
-    st.markdown("""
-    - A pair plot provides a matrix of visualizations to show relationships between all pairs of numeric variables.
-    - The plots on the **diagonal** are **histograms or KDE plots**, showing the distribution of a single variable.
-    - The **off-diagonal plots** are **scatter plots**, showing the relationship between two different variables.
-    - This is a powerful tool for getting a quick overview of the relationships and distributions within your numeric data.
-    """)
-    st.pyplot(fig)
+    # Pairplot returns a Figure object, not a buffer directly. We handle it in the UI.
+    return fig
 
+@st.cache_resource(show_spinner="Generating categorical box plot...")
+def plot_categorical_boxplot(df: pd.DataFrame, cat_col: str, num_col: str):
+    """Generates a box plot of a numeric column grouped by a categorical column."""
+    # This function does not need a print_header as it's part of a larger section.
+    fig, ax = plt.subplots(figsize=(12, 8))
+    
+    # For readability, limit to the top 15 most frequent categories
+    top_categories = df[cat_col].value_counts().nlargest(15).index
+    df_filtered = df[df[cat_col].isin(top_categories)]
+    
+    sns.boxplot(data=df_filtered, x=cat_col, y=num_col, ax=ax)
+    
+    ax.set_title(f'Distribution of {num_col} across {cat_col} Categories', fontsize=16)
+    plt.xlabel(cat_col, fontsize=12)
+    plt.ylabel(num_col, fontsize=12)
+    plt.xticks(rotation=45, ha='right')
+    plt.tight_layout()
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png")
+    buf.seek(0)
+    plt.close(fig)
+    return fig, buf
+
+@st.cache_data(show_spinner="Generating time series plot...")
 def plot_time_series(df: pd.DataFrame, time_col: str, value_col: str):
     """Generates an interactive time series plot."""
     print_header(f"Generating Time Series Plot: '{value_col}' over '{time_col}'")
@@ -433,6 +388,7 @@ def scale_features(df: pd.DataFrame, columns_to_scale: list, scaler_type: str) -
     
     return df_processed
 
+@st.cache_data(show_spinner="Generating 3D scatter plot...")
 def plot_3d_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str, z_col: str, color_col: str | None = None):
     """Generates an interactive 3D scatter plot."""
     print_header(f"Generating 3D Scatter Plot: '{x_col}' vs '{y_col}' vs '{z_col}'")
@@ -459,6 +415,7 @@ def plot_3d_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str, z_col: str, c
     st.markdown(description)
     st.plotly_chart(fig, use_container_width=True)
 
+@st.cache_resource(show_spinner="Generating outlier pair plot...")
 def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
     """Creates a pair plot that highlights outlier data points to analyze their relationships with other variables."""
     if not outliers:
@@ -613,3 +570,327 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
             - Statistical interpretations
             """)
         st.markdown("---")
+
+def correct_data_type(df: pd.DataFrame, column: str, target_type: str) -> pd.DataFrame:
+    """Converts a column to a specified data type, handling errors."""
+    df_processed = df.copy()
+    
+    if column not in df_processed.columns:
+        st.error(f"❌ Column '{column}' not found in the DataFrame.")
+        return df # Return original df
+
+    st.write(f"Attempting to convert column **`{column}`** to **`{target_type}`**...")
+
+    try:
+        original_nulls = df_processed[column].isnull().sum()
+        if target_type == 'numeric':
+            # This will convert to int or float as appropriate, coercing errors to NaN
+            df_processed[column] = pd.to_numeric(df_processed[column], errors='coerce')
+        elif target_type == 'datetime':
+            df_processed[column] = pd.to_datetime(df_processed[column], errors='coerce')
+        elif target_type == 'category':
+            df_processed[column] = df_processed[column].astype('category')
+        elif target_type == 'string':
+            df_processed[column] = df_processed[column].astype(str)
+        else:
+            st.error(f"Unsupported target type '{target_type}'.")
+            return df # Return original df
+
+        st.success(f"✅ Successfully converted '{column}' to {target_type}.")
+        new_nulls = df_processed[column].isnull().sum()
+        if new_nulls > original_nulls:
+            st.warning(f"{new_nulls - original_nulls} values could not be converted and were set to null (NaN/NaT).")
+
+    except Exception as e:
+        st.error(f"❌ An error occurred during conversion of column '{column}': {e}")
+        return df # Return original df on failure
+
+    return df_processed
+
+@st.cache_data(show_spinner="Standardizing categories...")
+def standardize_categories(df: pd.DataFrame, column: str, values_to_merge: list, new_value: str) -> pd.DataFrame:
+    """Standardizes categories by merging multiple values into a single new value."""
+    df_processed = df.copy()
+    
+    if column not in df_processed.columns:
+        st.error(f"❌ Column '{column}' not found.")
+        return df
+
+    try:
+        df_processed[column] = df_processed[column].replace(values_to_merge, new_value)
+        st.success(f"✅ Standardized {len(values_to_merge)} categories into '{new_value}' in column '{column}'.")
+    except Exception as e:
+        st.error(f"❌ An error occurred during standardization: {e}")
+        return df
+
+    return df_processed
+
+@st.cache_data(show_spinner="Creating derived numeric column...")
+def create_derived_column_numeric(df: pd.DataFrame, col_a: str, operation: str, col_b: str, new_col_name: str) -> pd.DataFrame:
+    """Creates a new column by performing an operation on two numeric columns."""
+    df_processed = df.copy()
+
+    if new_col_name in df_processed.columns:
+        st.error(f"❌ Column '{new_col_name}' already exists. Please choose a different name.")
+        return df
+
+    try:
+        if operation == '+':
+            df_processed[new_col_name] = df_processed[col_a] + df_processed[col_b]
+        elif operation == '-':
+            df_processed[new_col_name] = df_processed[col_a] - df_processed[col_b]
+        elif operation == '*':
+            df_processed[new_col_name] = df_processed[col_a] * df_processed[col_b]
+        elif operation == '/':
+            # Add a small epsilon to avoid division by zero
+            df_processed[new_col_name] = df_processed[col_a] / (df_processed[col_b] + 1e-9)
+        
+        st.success(f"✅ Created new column '{new_col_name}' as `{col_a} {operation} {col_b}`.")
+    except Exception as e:
+        st.error(f"❌ An error occurred while creating the derived column: {e}")
+        return df
+
+    return df_processed
+
+@st.cache_data(show_spinner="Extracting datetime features...")
+def create_derived_column_datetime(df: pd.DataFrame, time_col: str, parts_to_extract: list) -> pd.DataFrame:
+    """Creates new columns by extracting parts from a datetime column."""
+    df_processed = df.copy()
+
+    try:
+        # Ensure the column is in datetime format, coercing errors
+        datetime_series = pd.to_datetime(df_processed[time_col], errors='coerce')
+
+        for part in parts_to_extract:
+            new_col_name = f"{time_col}_{part.lower().replace(' ', '_')}"
+            if part == "Year":
+                df_processed[new_col_name] = datetime_series.dt.year
+            elif part == "Month":
+                df_processed[new_col_name] = datetime_series.dt.month
+            elif part == "Day":
+                df_processed[new_col_name] = datetime_series.dt.day
+            elif part == "Quarter":
+                df_processed[new_col_name] = datetime_series.dt.quarter
+            elif part == "Day of Week":
+                df_processed[new_col_name] = datetime_series.dt.dayofweek
+            elif part == "Day Name":
+                df_processed[new_col_name] = datetime_series.dt.day_name()
+            elif part == "Week of Year":
+                df_processed[new_col_name] = datetime_series.dt.isocalendar().week
+        
+        st.success(f"✅ Extracted {', '.join(parts_to_extract)} from '{time_col}'.")
+    except Exception as e:
+        st.error(f"❌ An error occurred while extracting datetime parts: {e}")
+        return df
+
+    return df_processed
+
+@st.cache_data(show_spinner="Creating binned column...")
+def create_binned_column(df: pd.DataFrame, col_to_bin: str, num_bins: int, new_col_name: str) -> pd.DataFrame:
+    """Creates a new categorical column by binning a numeric column."""
+    df_processed = df.copy()
+    
+    if new_col_name in df_processed.columns:
+        st.error(f"❌ Column '{new_col_name}' already exists. Please choose a different name.")
+        return df
+
+    try:
+        df_processed[new_col_name] = pd.cut(df_processed[col_to_bin], bins=num_bins, labels=False, include_lowest=True)
+        st.success(f"✅ Created binned column '{new_col_name}' from '{col_to_bin}' with {num_bins} bins.")
+    except Exception as e:
+        st.error(f"❌ An error occurred during binning: {e}")
+        return df
+
+    return df_processed
+
+@st.cache_data(show_spinner="Generating grouped analysis...")
+def plot_grouped_analysis(df: pd.DataFrame):
+    """
+    Performs grouped analysis by plotting the mean of numeric columns against top categories of a categorical column.
+    """
+    print_header("Grouped Analysis (Mean of Numeric by Category)")
+
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+    numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+
+    if not categorical_cols:
+        st.info("No categorical columns found for grouped analysis.")
+        return
+    if not numeric_cols:
+        st.info("No numeric columns found for grouped analysis.")
+        return
+
+    # Heuristic: Pick a categorical column with a reasonable number of unique values (2-20 is ideal)
+    cat_col_to_use = None
+    for col in categorical_cols:
+        if 2 <= df[col].nunique() <= 20:
+            cat_col_to_use = col
+            break
+    
+    if not cat_col_to_use: # Fallback if no ideal column is found
+        cat_col_to_use = categorical_cols[0]
+
+    st.markdown(f"Showing the average of numeric columns, grouped by the **`{cat_col_to_use}`** category. This helps to see how numeric values differ across different groups.")
+    
+    # Limit to top 20 categories for readability
+    top_categories = df[cat_col_to_use].value_counts().nlargest(20).index
+    df_filtered = df[df[cat_col_to_use].isin(top_categories)]
+
+    for num_col in numeric_cols:
+        with st.expander(f"Mean of `{num_col}` by `{cat_col_to_use}`"):
+            try:
+                fig = px.bar(df_filtered.groupby(cat_col_to_use)[num_col].mean().reset_index(), 
+                             x=cat_col_to_use, y=num_col, title=f'Mean of {num_col} by {cat_col_to_use}')
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error(f"Could not generate grouped plot for '{num_col}': {e}")
+
+@st.cache_data(show_spinner="Generating faceted scatter plot...")
+def plot_faceted_scatter(df: pd.DataFrame):
+    """
+    Generates a faceted scatter plot to show the relationship between two numeric variables across different categories.
+    """
+    print_header("Faceted Scatter Analysis (2 Numerics by 1 Category)")
+
+    numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+    categorical_cols = df.select_dtypes(include=['object', 'category']).columns.tolist()
+
+    if len(numeric_cols) < 2:
+        st.info("Not enough numeric columns (at least 2 required) for a faceted scatter plot.")
+        return
+    if not categorical_cols:
+        st.info("No categorical columns found for a faceted scatter plot.")
+        return
+
+    # --- Heuristics for column selection ---
+    # 1. Find a suitable categorical column (low cardinality)
+    cat_col_to_use = None
+    for col in categorical_cols:
+        if 2 <= df[col].nunique() <= 10:
+            cat_col_to_use = col
+            break
+    if not cat_col_to_use: # Fallback
+        cat_col_to_use = categorical_cols[0]
+
+    # 2. Find the two most correlated numeric columns
+    corr_matrix = df[numeric_cols].corr().abs()
+    sol = corr_matrix.unstack()
+    so = sol.sort_values(kind="quicksort", ascending=False)
+    so = so[so < 1] # Remove self-correlations
+    if so.empty:
+        x_col, y_col = numeric_cols[0], numeric_cols[1]
+    else:
+        x_col, y_col = so.index[0]
+
+    st.markdown(f"This plot shows the relationship between the two most correlated numeric variables, **`{x_col}`** and **`{y_col}`**, broken down by the categories in **`{cat_col_to_use}`**.")
+    st.markdown("This helps to see if the relationship between the two numeric variables is consistent across different groups.")
+
+    try:
+        fig = px.scatter(df, x=x_col, y=y_col, facet_col=cat_col_to_use, facet_col_wrap=4,
+                         title=f'Scatter plot of {x_col} vs {y_col}, Faceted by {cat_col_to_use}')
+        st.plotly_chart(fig, use_container_width=True)
+    except Exception as e:
+        st.error(f"Could not generate faceted scatter plot: {e}")
+
+@st.cache_data(show_spinner="Calculating segmentation")
+def _calculate_pareto_analysis(df: pd.DataFrame, id_col: str, value_col: str):
+    """
+    Internal cached function to perform the heavy lifting of Pareto analysis.
+    """
+    grouped_df = df.groupby(id_col)[value_col].sum().sort_values(ascending=False).reset_index()
+    grouped_df['cumulative_value'] = grouped_df[value_col].cumsum()
+    total_value = grouped_df[value_col].sum()
+    if total_value == 0: # Avoid division by zero
+        grouped_df['cumulative_percentage'] = 0
+    else:
+        grouped_df['cumulative_percentage'] = (grouped_df['cumulative_value'] / total_value) * 100
+
+    # Create segments
+    pareto_threshold = 80
+    top_segment = grouped_df[grouped_df['cumulative_percentage'] <= pareto_threshold]
+    bottom_segment = grouped_df[grouped_df['cumulative_percentage'] > pareto_threshold]
+    return top_segment, bottom_segment, len(grouped_df)
+
+def perform_segmentation_analysis(df: pd.DataFrame):
+    """
+    Performs segmentation analysis, focusing on a Pareto (80/20) analysis of customers or entities.
+    Handles UI for column selection and displays results.
+    """
+    print_header("Segmentation & Grouping (Pareto Analysis)")
+
+    run_analysis = False
+
+    # --- Heuristics to find ID and Value columns ---
+    id_col = None
+    value_col = None
+
+    # Find a potential ID column (high unique values)
+    for col in df.columns:
+        if 'id' in col.lower() or 'customer' in col.lower() or 'user' in col.lower():
+            if df[col].nunique() / len(df) > 0.5: # Likely an identifier
+                id_col = col
+                break
+
+    # Find a potential value column (numeric, positive values)
+    for col in df.select_dtypes(include=np.number).columns:
+        if any(keyword in col.lower() for keyword in ['sales', 'revenue', 'price', 'amount', 'value']):
+            if (df[col] >= 0).all(): # Values are generally non-negative
+                value_col = col
+                break
+
+    # --- Manual Fallback if automatic detection fails ---
+    if not id_col or not value_col:
+        st.info("Could not automatically identify suitable ID and Value columns (e.g., 'CustomerID' and 'Sales') for segmentation analysis.")
+        st.warning("Please manually select the columns for the analysis below.")
+
+        all_cols = df.columns.tolist()
+        numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+
+        # Create two columns for a cleaner layout
+        col1, col2 = st.columns(2)
+        with col1:
+            id_col = st.selectbox("Select the ID column (e.g., CustomerID, UserID):", options=all_cols)
+        with col2:
+            value_col = st.selectbox("Select the Value column (e.g., Sales, Revenue):", options=numeric_cols)
+        
+        if st.button("Run Manual Segmentation Analysis"):
+            run_analysis = True
+    else:
+        run_analysis = True
+
+    if run_analysis and id_col and value_col:
+        st.markdown(f"Performing a Pareto analysis by segmenting **`{id_col}`** based on their total **`{value_col}`**.")
+        st.markdown("The goal is to identify the vital few (e.g., top 20% of customers) who contribute the most value.")
+        st.markdown("---")
+
+        # --- Perform Segmentation by calling the cached function ---
+        top_segment, bottom_segment, num_total = _calculate_pareto_analysis(df, id_col, value_col)
+
+        if top_segment is not None and num_total > 0:
+            num_top = len(top_segment)
+            percent_top_customers = (num_top / num_total) * 100
+            pareto_threshold = 80
+
+            st.subheader("Insights Generated")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.success("Top Segment (The Vital Few)")
+                st.metric(label=f"Top {percent_top_customers:.1f}% of '{id_col}'s", value=f"{num_top} entities")
+                st.metric(label=f"Contribute to Value", value=f"{pareto_threshold}% of Total {value_col}")
+
+            with col2:
+                st.warning("Bottom Segment (The Trivial Many)")
+                st.metric(label=f"Bottom {100-percent_top_customers:.1f}% of '{id_col}'s", value=f"{len(bottom_segment)} entities")
+                st.metric(label=f"Contribute to Value", value=f"{100-pareto_threshold}% of Total '{value_col}'")
+
+            st.markdown("### Where to focus business efforts:")
+            st.markdown(f"- The **Top Segment** represents your most valuable customers/entities. Focus retention, up-selling, and premium services on this group.")
+            st.markdown(f"- The **Bottom Segment** is less impactful. Efforts here could focus on automated marketing or identifying potential for growth.")
+
+            # --- Visualization ---
+            st.subheader("Segment Value Distribution")
+            fig = px.bar(x=['Top Segment', 'Bottom Segment'], 
+                         y=[top_segment[value_col].sum(), 0],
+                         title=f"Total '{value_col}' by Segment", labels={'x': 'Segment', 'y': f'Total {value_col}'})
+            st.plotly_chart(fig, use_container_width=True)

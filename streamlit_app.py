@@ -12,7 +12,12 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 import numpy as np
 import full_report as fr
-import Backend as be # Import the backend logic
+import backend as be # Import the backend logic
+import one_click_analyst as oca # Import the new feature module
+import automated_insights as ai # Import the new insights module
+import automated_cleaning as ac # Import the cleaning suggestions module
+import exploratory_data_analysis as eda # Import the new EDA module
+import time_series_analysis as tsa # Import the new time-series module
 import warnings
 
 # Suppress warnings for a cleaner output
@@ -49,7 +54,7 @@ def main():
             st.session_state.analysis_type = "Select an option"
 
         workflow_step = st.sidebar.radio("Choose a step:",
-                                         ["Data Preprocessing", "Data Analysis"])
+                                         ["One-Click Data Analyst", "Data Preprocessing", "Custom Analysis"])
 
         if workflow_step == "Data Preprocessing":
             be.print_header("Data Preprocessing")
@@ -130,11 +135,91 @@ def main():
                         st.rerun()
                     else:
                         st.warning("Please select at least one column to scale.")
+            
+            # --- Correct Data Types ---
+            st.subheader("5. Correct Data Types")
+            col_to_convert = st.selectbox("Select a column to convert:", options=df.columns, key="convert_dtype_col")
+            if col_to_convert:
+                target_type = st.selectbox("Select target data type:", ["int", "float", "datetime", "string"], key="convert_dtype_type")
+                if st.button("Convert Data Type"):
+                    st.session_state.processed_df = be.correct_data_type(df, col_to_convert, target_type)
+                    st.rerun()
 
+            # --- Standardize Categories ---
+            st.subheader("6. Standardize Categories")
+            categorical_cols_for_std = df.select_dtypes(include=['object', 'category']).columns.tolist()
+            if not categorical_cols_for_std:
+                st.info("No categorical columns available for standardization.")
+            else:
+                col_to_standardize = st.selectbox("Select a categorical column to standardize:", options=categorical_cols_for_std, key="standardize_col")
+                if col_to_standardize:
+                    unique_values = df[col_to_standardize].unique().tolist()
+                    values_to_merge = st.multiselect("Select values to merge/rename:", options=unique_values, key="standardize_vals")
+                    new_value = st.text_input("Enter the new standardized category name:", key="standardize_new_val")
+                    if st.button("Standardize Categories"):
+                        if values_to_merge and new_value:
+                            st.session_state.processed_df = be.standardize_categories(df, col_to_standardize, values_to_merge, new_value)
+                            st.rerun()
+                        else:
+                            st.warning("Please select values to merge and provide a new category name.")
+            
+            # --- Create Derived Columns ---
+            st.subheader("7. Create Derived Columns")
+            derivation_type = st.selectbox("Select a method to create a new column:", 
+                                           ["From two numeric columns (e.g., A - B)", 
+                                            "Extract from a datetime column", 
+                                            "Create bins from a numeric column (e.g., Age to Age Group)"])
 
+            if derivation_type == "From two numeric columns (e.g., A - B)":
+                numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+                if len(numeric_cols) >= 2:
+                    col_a = st.selectbox("Select the first column (A):", numeric_cols, key="derive_a")
+                    operation = st.selectbox("Select operation:", ["+", "-", "*", "/"], key="derive_op")
+                    col_b = st.selectbox("Select the second column (B):", numeric_cols, key="derive_b")
+                    new_col_name = st.text_input("Enter new column name (e.g., Profit):", key="derive_new_name")
+                    if st.button("Create Derived Column"):
+                        if new_col_name:
+                            st.session_state.processed_df = be.create_derived_column_numeric(df, col_a, operation, col_b, new_col_name)
+                            st.rerun()
+                        else:
+                            st.warning("Please provide a name for the new column.")
+                else:
+                    st.warning("At least two numeric columns are required for this operation.")
+            
+            elif derivation_type == "Extract from a datetime column":
+                # Heuristically find potential datetime columns
+                potential_time_cols = [col for col in df.columns if pd.api.types.is_datetime64_any_dtype(df[col]) or 'date' in col.lower() or 'time' in col.lower()]
+                if not potential_time_cols:
+                    st.warning("No potential datetime columns detected. Please convert a column to datetime format first using the 'Correct Data Types' tool.")
+                else:
+                    time_col = st.selectbox("Select the datetime column to extract from:", potential_time_cols, key="derive_time_col")
+                    parts_to_extract = st.multiselect("Select parts to extract:", 
+                                                      ["Year", "Month", "Day", "Quarter", "Day of Week", "Day Name", "Week of Year"],
+                                                      key="derive_time_parts")
+                    if st.button("Extract Time-based Features"):
+                        if time_col and parts_to_extract:
+                            st.session_state.processed_df = be.create_derived_column_datetime(df, time_col, parts_to_extract)
+                            st.rerun()
+                        else:
+                            st.warning("Please select a datetime column and at least one part to extract.")
+            
+            elif derivation_type == "Create bins from a numeric column (e.g., Age to Age Group)":
+                numeric_cols = df.select_dtypes(include=np.number).columns.tolist()
+                if not numeric_cols:
+                    st.warning("No numeric columns available for binning.")
+                else:
+                    col_to_bin = st.selectbox("Select the numeric column to bin:", numeric_cols, key="derive_bin_col")
+                    num_bins = st.number_input("Enter the number of bins (e.g., 5):", min_value=2, max_value=50, value=5, key="derive_bin_num")
+                    st.info("This process, also known as discretization, divides the continuous numeric data into a specified number of discrete intervals (bins). For example, binning an 'Age' column into 5 bins could create groups like '0-15', '16-30', etc. This is useful for turning numeric data into categorical data for analysis.")
+                    new_col_name = st.text_input("Enter new column name (e.g., Age_Group):", key="derive_bin_name")
+                    if st.button("Create Binned Column"):
+                        if new_col_name and col_to_bin:
+                            st.session_state.processed_df = be.create_binned_column(df, col_to_bin, num_bins, new_col_name)
+                            st.rerun()
+                        else:
+                            st.warning("Please select a column and provide a name for the new binned column.")
 
-
-        elif workflow_step == "Data Analysis":
+        elif workflow_step == "Custom Analysis":
             st.sidebar.header("3. Choose Analysis Type")
             analysis_type = st.sidebar.radio("Select Analysis",
                                              ["Select an option", "Full Insights Report", "Univariate Analysis", "Multivariate Analysis", "Temporal Analysis"],
@@ -230,6 +315,9 @@ def main():
                     if st.button("Generate Time Series Plot"):
                         with st.spinner("Generating time series plot..."):
                             be.plot_time_series(df_temp, time_col, value_col)
+
+        elif workflow_step == "One-Click Data Analyst":
+            oca.generate_report(df, be)
 
     else:
         st.info("Awaiting for a dataset to be uploaded.")
