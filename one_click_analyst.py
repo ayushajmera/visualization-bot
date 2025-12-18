@@ -20,13 +20,22 @@ def generate_report(df, be):
     be.print_header("One-Click Data Analyst")
     st.info("Click the button below to generate a full automated report for the entire dataset. This may take a few moments depending on the size of your data.")
 
-    # Run button — only triggers the analysis when clicked
-    # Center the button but run the analysis at top-level so report content uses full width
+    # Use session state to remember that the automated analysis was requested
+    # This prevents the report from disappearing on subsequent Streamlit reruns (e.g., when sliders change)
+    if 'oca_run' not in st.session_state:
+        st.session_state.oca_run = False
+
     left, middle, right = st.columns([1, 2, 1])
     with left:
-        run = st.button("Run Full Automated Analysis")
+        if st.button("Run Full Automated Analysis"):
+            st.session_state.oca_run = True
 
-    if run:
+    with right:
+        if st.button("Reset Full Automated Analysis"):
+            st.session_state.oca_run = False
+
+    # If the run flag is set, (re-)execute the analysis steps so the UI is rebuilt on every rerun
+    if st.session_state.oca_run:
         with st.spinner("Running full automated analysis... this may take a few moments"):
             # 1. Perform Data Quality Audit first
             da.perform_audit(df, be)
@@ -48,4 +57,4 @@ def generate_report(df, be):
             tsa.perform_time_series_analysis(df, be)
             st.markdown("---") # Add a separator
 
-        st.success("Full automated analysis complete!")
+        st.success("Full automated analysis complete! (Use the 'Reset' button to clear results.)")

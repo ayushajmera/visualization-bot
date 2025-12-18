@@ -23,6 +23,23 @@ import warnings
 # Suppress warnings for a cleaner output
 warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
 
+def reset_analysis_type():
+    """Callback to reset the analysis type in session state."""
+    st.session_state.analysis_type = "Select an option"
+
+# Define a fragment for the One-Click Analyst to prevent full app reruns on interaction
+if hasattr(st, "fragment"):
+    @st.fragment
+    def run_oca_fragment(df, be):
+        oca.generate_report(df, be)
+elif hasattr(st, "experimental_fragment"):
+    @st.experimental_fragment
+    def run_oca_fragment(df, be):
+        oca.generate_report(df, be)
+else:
+    def run_oca_fragment(df, be):
+        oca.generate_report(df, be)
+
 def main():
     """Main function to run the Visualization Bot."""
     st.set_page_config(page_title="Visualization Bot", layout="wide")
@@ -36,7 +53,7 @@ def main():
 
     with st.sidebar:
         st.header("1. Load Data")
-        uploaded_file = st.file_uploader("Choose a CSV, Excel, or JSON file", type=['csv', 'xlsx', 'xls', 'json', 'txt'])
+        uploaded_file = st.file_uploader("Choose a CSV, Excel, or JSON file", type=['csv', 'xlsx', 'xls', 'json', 'txt'], key="file_uploader")
         
         if uploaded_file is not None:
             # Check if it's a new file before reloading
@@ -44,6 +61,9 @@ def main():
                 st.session_state.df = be.load_dataset(uploaded_file)
                 st.session_state.processed_df = st.session_state.df.copy() if st.session_state.df is not None else None
                 st.session_state.file_name = uploaded_file.name
+                # Reset One-Click Analyst run flag when a new dataset is loaded so old results don't persist
+                if 'oca_run' in st.session_state:
+                    st.session_state.oca_run = False
 
         # --- Appearance / Palette Selector ---
         st.markdown("---")
@@ -59,12 +79,10 @@ def main():
         df = st.session_state.processed_df
         st.sidebar.header("Workflow")
 
-        # Add a key and an on_change callback to reset analysis type
-        def reset_analysis_type():
-            st.session_state.analysis_type = "Select an option"
-
         workflow_step = st.sidebar.radio("Choose a step:",
-                                         ["One-Click Data Analyst", "Data Preprocessing", "Custom Analysis"])
+                                         ["One-Click Data Analyst", "Data Preprocessing", "Custom Analysis"],
+                                         key="workflow_step",
+                                         on_change=reset_analysis_type)
 
         if workflow_step == "Data Preprocessing":
             be.print_header("Data Preprocessing")
@@ -343,7 +361,7 @@ def main():
                             be.plot_time_series(df_temp, time_col, value_col)
 
         elif workflow_step == "One-Click Data Analyst":
-            oca.generate_report(df, be)
+            run_oca_fragment(df, be)
 
     else:
         st.info("Awaiting for a dataset to be uploaded.")
