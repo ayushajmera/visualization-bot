@@ -20,25 +20,32 @@ def generate_report(df, be):
     be.print_header("One-Click Data Analyst")
     st.info("Click the button below to generate a full automated report for the entire dataset. This may take a few moments depending on the size of your data.")
 
-    if st.button("Run Full Automated Analysis"):
-        # 1. Perform Data Quality Audit first
-        da.perform_audit(df, be)
-        st.markdown("---") # Add a separator
+    # Run button — only triggers the analysis when clicked
+    # Center the button but run the analysis at top-level so report content uses full width
+    left, middle, right = st.columns([1, 2, 1])
+    with left:
+        run = st.button("Run Full Automated Analysis")
 
-        # 2. Generate text-based insights
-        ai.generate_text_insights(df)
-        st.markdown("---") # Add a separator
+    if run:
+        with st.spinner("Running full automated analysis... this may take a few moments"):
+            # 1. Perform Data Quality Audit first
+            da.perform_audit(df, be)
+            st.markdown("---") # Add a separator
 
-        # 3. Generate cleaning and preparation suggestions
-        ac.generate_cleaning_suggestions(df)
-        st.markdown("---") # Add a separator
+            # 2. Generate text-based insights
+            ai.generate_text_insights(df)
+            st.markdown("---") # Add a separator
 
-        # 4. Perform Exploratory Data Analysis
-        eda.perform_eda(df, be)
-        st.markdown("---") # Add a separator
+            # 3. Generate cleaning and preparation suggestions
+            ac.generate_cleaning_suggestions(df)
+            st.markdown("---") # Add a separator
 
-        # 5. Perform Time-Based Analysis
-        tsa.perform_time_series_analysis(df, be)
-        st.markdown("---") # Add a separator
+            # 4. Perform Exploratory Data Analysis
+            eda.perform_eda(df, be)
+            st.markdown("---") # Add a separator
+
+            # 5. Perform Time-Based Analysis
+            tsa.perform_time_series_analysis(df, be)
+            st.markdown("---") # Add a separator
 
         st.success("Full automated analysis complete!")

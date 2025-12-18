@@ -16,6 +16,59 @@ import warnings
 # Suppress warnings for a cleaner output
 warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
 
+# --- Visualization theme / palette management ---
+# Default palette mapping for both seaborn (matplotlib) and Plotly
+PALETTES = {
+    'Colorblind': {'sns': 'colorblind', 'plotly': px.colors.qualitative.Safe},
+    'Pastel': {'sns': 'pastel', 'plotly': px.colors.qualitative.Pastel},
+    'Muted': {'sns': 'muted', 'plotly': px.colors.qualitative.Plotly},
+    'Deep': {'sns': 'deep', 'plotly': px.colors.qualitative.Dark24 if hasattr(px.colors.qualitative, 'Dark24') else px.colors.qualitative.Plotly},
+    'Viridis': {'sns': 'viridis', 'plotly': px.colors.sequential.Viridis}
+}
+
+# Current palette state
+_CURRENT_PALETTE_NAME = 'Colorblind'
+_CURRENT_PLOTLY_SEQ = PALETTES[_CURRENT_PALETTE_NAME]['plotly']
+
+# Initialize seaborn theme with default palette
+sns.set_theme(style='whitegrid', palette=PALETTES[_CURRENT_PALETTE_NAME]['sns'])
+
+
+def set_color_palette(palette_name: str):
+    """Set the color palette for seaborn/matplotlib and Plotly.
+
+    palette_name must be one of the keys in PALETTES.
+    When changed, this will **clear Streamlit caches** so that cached visualizations are regenerated with the new palette.
+    """
+    global _CURRENT_PALETTE_NAME, _CURRENT_PLOTLY_SEQ
+    if palette_name not in PALETTES:
+        st.warning(f"Palette '{palette_name}' not recognized. Using default '{_CURRENT_PALETTE_NAME}'.")
+        return
+    _CURRENT_PALETTE_NAME = palette_name
+    mapping = PALETTES[palette_name]
+    # Update seaborn theme
+    try:
+        sns.set_theme(style='whitegrid', palette=mapping['sns'])
+    except Exception:
+        # Fallback: use default seaborn theme
+        sns.set_theme(style='whitegrid')
+    # Update plotly color sequence
+    _CURRENT_PLOTLY_SEQ = mapping['plotly']
+
+    # Clear Streamlit caches so visuals regenerate using the new palette
+    try:
+        st.cache_data.clear()
+    except Exception:
+        pass
+    try:
+        st.cache_resource.clear()
+    except Exception:
+        pass
+
+
+def get_plotly_color_sequence():
+    return _CURRENT_PLOTLY_SEQ
+
 def print_header(title: str):
     """Prints a formatted header to the console."""
     st.header(title)
@@ -135,12 +188,35 @@ def detect_anomalies(series: pd.Series) -> dict:
     return outliers
 
 @st.cache_resource(show_spinner="Generating histogram...")
-def plot_histogram(df: pd.DataFrame, column: str):
-    """Generates and saves a histogram, highlighting outliers if provided."""
+def plot_histogram(df: pd.DataFrame, column: str, outliers_to_plot: list | None = None, outliers_summary_count: int | None = None):
+    """Generates and saves a histogram, highlighting outliers if provided.
+
+    Parameters:
+        df: DataFrame containing the data.
+        column: Column name to plot.
+        outliers_to_plot: Optional list of numeric outlier values to mark on the plot.
+        outliers_summary_count: Optional integer to display an outlier summary on the plot.
+    """
     # Explicitly create a figure and axes object
     fig, ax = plt.subplots(figsize=(12, 7))
-    sns.histplot(df[column], kde=True, bins=30, ax=ax)
+    # Use the first color from the current seaborn palette for the histogram
+    palette_colors = sns.color_palette()
+    hist_color = palette_colors[0] if palette_colors else None
+    sns.histplot(df[column], kde=True, bins=30, ax=ax, color=hist_color)
     
+    # If outliers are provided, mark them on the histogram
+    if outliers_to_plot:
+        try:
+            for val in outliers_to_plot:
+                # Draw a dashed red vertical line for each outlier
+                ax.axvline(val, color='red', linestyle='--', linewidth=1)
+            # Add a small legend/annotation showing the number of outliers, if provided
+            if outliers_summary_count is not None:
+                ax.text(0.95, 0.95, f'Outliers: {outliers_summary_count}', transform=ax.transAxes, ha='right', va='top',
+                        bbox=dict(boxstyle="round", facecolor="white", alpha=0.8))
+        except Exception as e:
+            # Fail gracefully and still return the histogram
+            st.warning(f"Could not annotate outliers on histogram: {e}")
     ax.set_title(f'Histogram of {column}', fontsize=16)
     plt.xlabel(column, fontsize=12)
     plt.ylabel('Frequency', fontsize=12)
@@ -159,59 +235,120 @@ def plot_histogram(df: pd.DataFrame, column: str):
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
-    plt.close(fig)
     return fig, buf
 
 @st.cache_resource(show_spinner="Generating bar chart...")
-def plot_bar_chart(df: pd.DataFrame, column: str): 
-    """Generates and saves a bar chart for a categorical column."""
+def plot_bar_chart(df: pd.DataFrame, column: str, max_bars: int = 20, **kwargs): 
+    """Generates and saves a bar chart for a categorical column.
+
+    To keep charts readable, only the top `max_bars` categories are shown; the rest are grouped into an 'Other' bucket.
+    """
     fig, ax = plt.subplots(figsize=(12, 7))
     
-    # Use value_counts and plot for better control, especially with many categories
-    counts = df[column].value_counts().nlargest(20) # Limit to top 20 for readability
-    sns.barplot(x=counts.index, y=counts.values, ax=ax)
+    # Use value_counts and handle grouping if too many categories
+    counts = df[column].value_counts()
+
+    if counts.empty:
+        st.warning(f"Column '{column}' contains no values to plot.")
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png")
+        buf.seek(0)
+        return fig, buf
+
+    if len(counts) > max_bars:
+        st.warning(f"Column '{column}' has {len(counts)} categories — showing top {max_bars} and grouping the rest as 'Other'.")
+        top_counts = counts.nlargest(max_bars)
+        other_sum = counts.drop(top_counts.index).sum()
+        counts = top_counts
+        if other_sum > 0:
+            counts['Other'] = other_sum
+
+    counts = counts.sort_values(ascending=False)
+    colors = sns.color_palette(n_colors=len(counts))
+
+    # Dynamic sizing and explicit bar width for predictable rendering across counts
+    num_bars = len(counts)
+    if num_bars <= 10:
+        fig.set_size_inches(max(8, num_bars * 0.9), 6)
+        bar_width = 0.6
+    elif num_bars <= 20:
+        fig.set_size_inches(max(10, num_bars * 0.6), 6.5)
+        bar_width = 0.6
+    else:
+        fig.set_size_inches(max(12, num_bars * 0.45), 7)
+        bar_width = max(0.35, min(0.8, 10.0 / num_bars))
+
+    # Draw bars with Matplotlib directly for predictable rendering and visible edges
+    x_positions = np.arange(num_bars)
+    ax.bar(x_positions, counts.values, width=bar_width, color=colors, edgecolor='black', linewidth=0.6)
+    ax.set_xticks(x_positions)
+    ax.set_xticklabels(counts.index, rotation=45, ha='right')
+
+    # Ensure axes limits include the bars clearly
+    ax.set_xlim(-0.5, num_bars - 0.5 + (1 - bar_width))
+    ax.set_ylim(0, counts.values.max() * 1.15 if counts.values.max() > 0 else 1)
 
     ax.set_title(f'Bar Chart of {column}', fontsize=16)
     plt.xlabel(column, fontsize=12)
     plt.ylabel('Count', fontsize=12)
-    ax.tick_params(axis='x', rotation=45)
+    ax.margins(x=0.01)
     plt.tight_layout() # Adjust plot to prevent labels from overlapping
     
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
-    plt.close(fig)
     return fig, buf
 
 @st.cache_resource(show_spinner="Generating pie chart...")
-def plot_pie_chart(df: pd.DataFrame, column: str):
-    """Generates and saves a pie chart for a categorical column."""
+def plot_pie_chart(df: pd.DataFrame, column: str, max_slices: int = 10):
+    """Generates and saves a pie chart for a categorical column.
+
+    To avoid creating many microscopically thin slices, we limit the chart to the top
+    `max_slices` categories and group all remaining categories into an 'Other' slice.
+    """
     fig, ax = plt.subplots(figsize=(10, 10))
     
     counts = df[column].value_counts()
-    # Group small slices into 'Other' for clarity
-    if len(counts) > 10:
-        threshold = counts.nlargest(9).min()
-        other = counts[counts < threshold].sum()
-        counts = counts[counts >= threshold]
-        if other > 0:
-            counts['Other'] = other
 
-    ax.pie(counts, labels=counts.index, autopct='%1.1f%%', startangle=140, wedgeprops={'edgecolor': 'white'})
+    if counts.empty:
+        st.warning(f"Column '{column}' contains no values to plot.")
+        # Return an empty figure
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png")
+        buf.seek(0)
+        return fig, buf
+
+    # If there are more categories than max_slices, keep only the top categories and group the rest
+    if len(counts) > max_slices:
+        st.warning(f"Column '{column}' has {len(counts)} unique categories — limiting pie chart to the top {max_slices} and grouping the rest as 'Other'.")
+        top_counts = counts.nlargest(max_slices)
+        other_sum = counts.drop(top_counts.index).sum()
+        counts = top_counts
+        if other_sum > 0:
+            counts['Other'] = other_sum
+
+    # Sort counts so the largest slices come first for better readability
+    counts = counts.sort_values(ascending=False)
+
+    # Draw the pie chart with percentages and a tidy layout
+    colors = sns.color_palette(n_colors=len(counts))
+    ax.pie(counts, labels=counts.index, autopct=lambda pct: f"{pct:.1f}%" if pct >= 1 else '', startangle=140, wedgeprops={'edgecolor': 'white'}, colors=colors)
     ax.set_title(f'Pie Chart of {column}', fontsize=16)
     plt.ylabel('') # Hide the y-label which is often the column name
+    plt.tight_layout()
     
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
-    plt.close(fig)
     return fig, buf
 
 @st.cache_resource(show_spinner="Generating box plot...")
 def plot_box_plot(df: pd.DataFrame, column: str):
     """Generates and saves a box plot for a numeric column."""
     fig, ax = plt.subplots(figsize=(12, 7))
-    sns.boxplot(x=df[column], ax=ax)
+    palette_colors = sns.color_palette()
+    box_color = palette_colors[0] if palette_colors else None
+    sns.boxplot(x=df[column], ax=ax, color=box_color)
     ax.set_title(f'Box Plot of {column}', fontsize=16)
     plt.xlabel(column, fontsize=12)
     plt.grid(axis='x', alpha=0.5)
@@ -220,7 +357,6 @@ def plot_box_plot(df: pd.DataFrame, column: str):
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
-    plt.close(fig)
     return fig, buf
 
 @st.cache_resource(show_spinner="Generating correlation heatmap...")
@@ -243,14 +379,14 @@ def plot_correlation_heatmap(df: pd.DataFrame):
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
-    plt.close(fig)
     return fig, buf
 
 @st.cache_data(show_spinner="Generating scatter plot...")
 def plot_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str):
     """Generates an interactive scatter plot for two numeric columns."""
     fig = px.scatter(df, x=x_col, y=y_col, title=f'Scatter Plot: {y_col} vs. {x_col}',
-                     trendline="ols", trendline_color_override="red")
+                     trendline="ols", trendline_color_override="red",
+                     color_discrete_sequence=get_plotly_color_sequence(), template='plotly_white')
     
     # Add description and conclusion
     st.subheader("What this graph shows:")
@@ -261,6 +397,7 @@ def plot_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str):
     - The **red line** is a **trendline** (calculated using Ordinary Least Squares regression), which shows the general direction of the relationship.
     - Hover over points to see their exact values.
     """)
+    # Note: Do not render the chart here; return the Plotly Figure for the caller to display.
     return fig
 
 @st.cache_resource(show_spinner="Generating pair plot...")
@@ -275,7 +412,12 @@ def plot_pair_plot(df: pd.DataFrame):
         numeric_df = numeric_df.iloc[:, :5]
         
     st.info("Generating pair plot... this may take a moment.")
-    fig = sns.pairplot(numeric_df, diag_kind='kde')
+    # Respect the current seaborn palette
+    try:
+        pair_palette = sns.color_palette()
+        fig = sns.pairplot(numeric_df, diag_kind='kde', palette=pair_palette)
+    except Exception:
+        fig = sns.pairplot(numeric_df, diag_kind='kde')
     
     # Pairplot returns a Figure object, not a buffer directly. We handle it in the UI.
     return fig
@@ -301,14 +443,13 @@ def plot_categorical_boxplot(df: pd.DataFrame, cat_col: str, num_col: str):
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
-    plt.close(fig)
     return fig, buf
 
 @st.cache_data(show_spinner="Generating time series plot...")
 def plot_time_series(df: pd.DataFrame, time_col: str, value_col: str):
     """Generates an interactive time series plot."""
     print_header(f"Generating Time Series Plot: '{value_col}' over '{time_col}'")
-    fig = px.line(df, x=time_col, y=value_col, title=f'{value_col} over Time')
+    fig = px.line(df, x=time_col, y=value_col, title=f'{value_col} over Time', color_discrete_sequence=get_plotly_color_sequence(), template='plotly_white')
     
     # Add description and conclusion
     st.subheader("What this graph shows:")
@@ -317,7 +458,7 @@ def plot_time_series(df: pd.DataFrame, time_col: str, value_col: str):
     - It is used to identify trends, seasonality, and patterns in your data over a period.
     - You can interact with the plot by zooming and panning to inspect specific time ranges.
     """)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 def handle_missing_values(df: pd.DataFrame, column: str, strategy: str, fill_value=None) -> pd.DataFrame:
     """Handles missing values in a specific column based on the selected strategy."""
@@ -398,7 +539,8 @@ def plot_3d_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str, z_col: str, c
     else:
         color_col = None # Ensure 'None' string is not passed to plotly
 
-    fig = px.scatter_3d(df, x=x_col, y=y_col, z=z_col, color=color_col, title=title)
+    fig = px.scatter_3d(df, x=x_col, y=y_col, z=z_col, color=color_col if color_col else None, title=title,
+                         color_discrete_sequence=get_plotly_color_sequence(), template='plotly_white')
     fig.update_traces(marker=dict(size=5))
     fig.update_layout(margin=dict(l=0, r=0, b=0, t=40))
 
@@ -412,7 +554,7 @@ def plot_3d_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str, z_col: str, c
         description += f"- The points are colored based on the **`{color_col}`** column, which can help identify clusters or patterns related to that variable."
     
     st.markdown(description)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 @st.cache_resource(show_spinner="Generating outlier pair plot...")
 def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
@@ -739,8 +881,9 @@ def plot_grouped_analysis(df: pd.DataFrame):
         with st.expander(f"Mean of `{num_col}` by `{cat_col_to_use}`"):
             try:
                 fig = px.bar(df_filtered.groupby(cat_col_to_use)[num_col].mean().reset_index(), 
-                             x=cat_col_to_use, y=num_col, title=f'Mean of {num_col} by {cat_col_to_use}')
-                st.plotly_chart(fig, use_container_width=True)
+                             x=cat_col_to_use, y=num_col, title=f'Mean of {num_col} by {cat_col_to_use}',
+                             color_discrete_sequence=get_plotly_color_sequence(), template='plotly_white')
+                st.plotly_chart(fig, width='stretch')
             except Exception as e:
                 st.error(f"Could not generate grouped plot for '{num_col}': {e}")
 
@@ -785,9 +928,24 @@ def plot_faceted_scatter(df: pd.DataFrame):
     st.markdown("This helps to see if the relationship between the two numeric variables is consistent across different groups.")
 
     try:
-        fig = px.scatter(df, x=x_col, y=y_col, facet_col=cat_col_to_use, facet_col_wrap=4,
-                         title=f'Scatter plot of {x_col} vs {y_col}, Faceted by {cat_col_to_use}')
-        st.plotly_chart(fig, use_container_width=True)
+        # Handle high-cardinality categorical columns: cap number of facets to top N categories
+        max_facets = 20
+        df_for_plot = df.copy()
+        actual_nuniques = df_for_plot[cat_col_to_use].nunique()
+        if actual_nuniques > max_facets:
+            st.warning(f"Column '{cat_col_to_use}' has {actual_nuniques} categories — limiting to top {max_facets} and grouping the rest as 'Other' for readability.")
+            top_cats = df_for_plot[cat_col_to_use].value_counts().nlargest(max_facets).index
+            df_for_plot[cat_col_to_use] = df_for_plot[cat_col_to_use].where(df_for_plot[cat_col_to_use].isin(top_cats), other='Other')
+
+        # Choose a sensible facet wrap and a small row spacing to avoid Plotly spacing errors
+        facet_wrap = 4
+        facet_row_spacing = 0.01
+
+        fig = px.scatter(df_for_plot, x=x_col, y=y_col, facet_col=cat_col_to_use, facet_col_wrap=facet_wrap,
+                         facet_row_spacing=facet_row_spacing,
+                         title=f'Scatter plot of {x_col} vs {y_col}, Faceted by {cat_col_to_use}',
+                         color_discrete_sequence=get_plotly_color_sequence(), template='plotly_white')
+        st.plotly_chart(fig, width='stretch')
     except Exception as e:
         st.error(f"Could not generate faceted scatter plot: {e}")
 
@@ -891,5 +1049,6 @@ def perform_segmentation_analysis(df: pd.DataFrame):
             st.subheader("Segment Value Distribution")
             fig = px.bar(x=['Top Segment', 'Bottom Segment'], 
                          y=[top_segment[value_col].sum(), 0],
-                         title=f"Total '{value_col}' by Segment", labels={'x': 'Segment', 'y': f'Total {value_col}'})
-            st.plotly_chart(fig, use_container_width=True)
+                         title=f"Total '{value_col}' by Segment", labels={'x': 'Segment', 'y': f'Total {value_col}'},
+                         color_discrete_sequence=get_plotly_color_sequence(), template='plotly_white')
+            st.plotly_chart(fig, width='stretch')

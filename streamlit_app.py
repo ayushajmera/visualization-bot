@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 import numpy as np
 import full_report as fr
-import Backend as be # Import the backend logic
+import backend as be # Import the backend logic
 import one_click_analyst as oca # Import the new feature module
 import automated_insights as ai # Import the new insights module
 import automated_cleaning as ac # Import the cleaning suggestions module
@@ -44,6 +44,16 @@ def main():
                 st.session_state.df = be.load_dataset(uploaded_file)
                 st.session_state.processed_df = st.session_state.df.copy() if st.session_state.df is not None else None
                 st.session_state.file_name = uploaded_file.name
+
+        # --- Appearance / Palette Selector ---
+        st.markdown("---")
+        st.header("Appearance")
+        try:
+            palette_choice = st.selectbox("Select color palette for visuals:", options=list(be.PALETTES.keys()), index=0, key='ui_palette')
+            be.set_color_palette(palette_choice)
+        except Exception:
+            # In case PALETTES is not available for some reason, silently continue
+            pass
 
     if st.session_state.processed_df is not None:
         df = st.session_state.processed_df
@@ -245,15 +255,25 @@ def main():
                         numeric_cols = df.select_dtypes(include=np.number).columns
                         for col in numeric_cols:
                             with st.expander(f"Analysis for '{col}'"):
-                                be.plot_histogram(df, col) # Here, outliers_to_plot is None by default, which is fine.
-                                be.plot_box_plot(df, col)
+                                hist_fig, hist_buf = be.plot_histogram(df, col)
+                                st.pyplot(hist_fig)
+                                st.download_button("Download Histogram", hist_buf, f"histogram_{col}.png", "image/png")
+
+                                box_fig, box_buf = be.plot_box_plot(df, col)
+                                st.pyplot(box_fig)
+                                st.download_button("Download Box Plot", box_buf, f"boxplot_{col}.png", "image/png")
 
                         st.subheader("Analysis of Categorical Columns")
                         categorical_cols = df.select_dtypes(include=['object', 'category']).columns
                         for col in categorical_cols:
                             with st.expander(f"Analysis for '{col}'"):
-                                be.plot_bar_chart(df, col)
-                                be.plot_pie_chart(df, col)
+                                bar_fig, bar_buf = be.plot_bar_chart(df, col)
+                                st.pyplot(bar_fig)
+                                st.download_button("Download Bar Chart", bar_buf, f"barchart_{col}.png", "image/png")
+
+                                pie_fig, pie_buf = be.plot_pie_chart(df, col)
+                                st.pyplot(pie_fig)
+                                st.download_button("Download Pie Chart", pie_buf, f"piechart_{col}.png", "image/png")
 
             elif analysis_type == "Multivariate Analysis":
                 be.print_header("Multivariate Analysis (Multiple Variables)")
@@ -274,7 +294,13 @@ def main():
                     col2 = st.selectbox("Select Y-axis column:", numeric_cols, key='scatter_y', index=min(1, len(numeric_cols)-1))
                     if st.button("Generate Scatter Plot"):
                         with st.spinner("Generating scatter plot..."):
-                            be.plot_scatter_plot(df, col1, col2)
+                            scatter_fig = be.plot_scatter_plot(df, col1, col2)
+                            if scatter_fig:
+                                st.plotly_chart(
+                                    scatter_fig,
+                                    width='stretch',
+                                    key=f"custom_scatter_{str(col1).replace(' ','_').replace('.','_')}__{str(col2).replace(' ','_').replace('.','_')}"
+                                )
                 else:
                     st.warning("At least two numeric columns are required for a scatter plot.")
 

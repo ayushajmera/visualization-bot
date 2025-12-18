@@ -20,7 +20,7 @@ def perform_eda(df, be):
     st.subheader("Univariate Analysis (Single Variable)")
     st.markdown("Here we analyze each column individually to understand its characteristics.")
 
-    for col in df.columns:
+    for idx, col in enumerate(df.columns):
         with st.expander(f"Analysis for Column: `{col}`"):
             if pd.api.types.is_numeric_dtype(df[col]):
                 st.markdown("#### Numerical Column Analysis")
@@ -35,13 +35,13 @@ def perform_eda(df, be):
                 # --- Distribution and Outliers ---
                 st.markdown("##### Distribution Shape & Outliers")
                 hist_fig, hist_buf = be.plot_histogram(df, col)
-                # Display the generated image buffer for consistent rendering
-                st.image(hist_buf, use_column_width=True)
+                # Display the generated figure for full-width rendering
+                st.pyplot(hist_fig)
                 st.download_button("Download Histogram", hist_buf, f"histogram_{col}.png", "image/png")
 
                 box_fig, box_buf = be.plot_box_plot(df, col)
-                # Display the generated image buffer for consistent rendering
-                st.image(box_buf, use_column_width=True)
+                # Display the generated figure for full-width rendering
+                st.pyplot(box_fig)
                 st.download_button("Download Box Plot", box_buf, f"boxplot_{col}.png", "image/png")
 
             else: # Categorical
@@ -59,15 +59,29 @@ def perform_eda(df, be):
                     st.markdown("Visualizations")
                     
                     st.markdown("###### Bar Chart")
-                    bar_fig, bar_buf = be.plot_bar_chart(df, col)
-                    # Use the image buffer to display the chart reliably in Streamlit
-                    st.image(bar_buf, use_column_width=True)
+                    # Allow the user to control how many categories to show in the bar chart. Categories beyond this are grouped into 'Other'.
+                    max_bars = st.slider(
+                        "Max bars (top N categories; others grouped into 'Other')",
+                        min_value=2, max_value=50, value=20, step=1,
+                        help="Limit the number of bars so the chart remains readable.",
+                        key=f"max_bar_slices_{idx}_{col}"
+                    )
+                    bar_fig, bar_buf = be.plot_bar_chart(df, col, max_bars=max_bars)
+                    # Display the generated figure for full-width rendering
+                    st.pyplot(bar_fig)
                     st.download_button("Download Bar Chart", bar_buf, f"barchart_{col}.png", "image/png")
 
                     st.markdown("###### Pie Chart")
-                    pie_fig, pie_buf = be.plot_pie_chart(df, col)
-                    # Use the image buffer to display the chart reliably in Streamlit
-                    st.image(pie_buf, use_column_width=True)
+                    # Allow the user to control how many slices to show in the pie chart. Categories beyond this are grouped into 'Other'.
+                    max_slices = st.slider(
+                        "Max pie slices (top N categories; others grouped into 'Other')",
+                        min_value=2, max_value=30, value=10, step=1,
+                        help="Limit the number of slices so the pie remains readable.",
+                        key=f"max_pie_slices_{idx}_{col}"
+                    )
+                    pie_fig, pie_buf = be.plot_pie_chart(df, col, max_slices=max_slices)
+                    # Display the generated figure for full-width rendering
+                    st.pyplot(pie_fig)
                     st.download_button("Download Pie Chart", pie_buf, f"piechart_{col}.png", "image/png")
                 else:
                     st.info("This column contains no data to analyze.")
@@ -85,8 +99,8 @@ def perform_eda(df, be):
         st.write("The heatmap below shows the linear correlation between all numeric variables. Values close to 1 (red) or -1 (blue) indicate a strong relationship.")
         heatmap_fig, heatmap_buf = be.plot_correlation_heatmap(df)
         if heatmap_fig:
-            # Use the saved image buffer to display the heatmap reliably
-            st.image(heatmap_buf, use_column_width=True)
+            # Display the generated figure for full-width rendering
+            st.pyplot(heatmap_fig)
             st.download_button("Download Heatmap", heatmap_buf, "correlation_heatmap.png", "image/png")
 
         if len(numeric_cols) >= 2:
@@ -105,7 +119,14 @@ def perform_eda(df, be):
                 # Call the cached function and then render the UI element
                 scatter_fig = be.plot_scatter_plot(df, var1, var2)
                 if scatter_fig:
-                    st.plotly_chart(scatter_fig, use_container_width=True)
+                    # Create a unique key for each scatter chart to avoid Streamlit DuplicateElementId errors
+                    safe_var1 = str(var1).replace(' ', '_').replace('.', '_')
+                    safe_var2 = str(var2).replace(' ', '_').replace('.', '_')
+                    st.plotly_chart(
+                        scatter_fig,
+                        width='stretch',
+                        key=f"scatter_{safe_var1}__{safe_var2}"
+                    )
 
     # --- Numeric vs. Categorical ---
     with st.expander("Numeric vs. Categorical Analysis"):
@@ -124,8 +145,8 @@ def perform_eda(df, be):
                     st.markdown(f"##### `{num_col}` across `{cat_col}` categories")
                     cat_box_fig, cat_box_buf = be.plot_categorical_boxplot(df, cat_col, num_col)
                     if cat_box_fig:
-                        # Display via buffer for consistent rendering
-                        st.image(cat_box_buf, use_column_width=True)
+                        # Display the generated figure for full-width rendering
+                        st.pyplot(cat_box_fig)
                         st.download_button(f"Download {num_col} vs {cat_col} Plot", cat_box_buf, f"cat_boxplot_{num_col}_{cat_col}.png", "image/png")
         else:
             st.info("Not enough numeric and categorical columns to perform this analysis.")
