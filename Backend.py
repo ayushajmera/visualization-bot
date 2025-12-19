@@ -235,6 +235,7 @@ def plot_histogram(df: pd.DataFrame, column: str, outliers_to_plot: list | None 
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
+    plt.close(fig)
     return fig, buf
 
 # Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
@@ -253,6 +254,7 @@ def plot_bar_chart(df: pd.DataFrame, column: str, max_bars: int = 20, **kwargs):
         buf = io.BytesIO()
         fig.savefig(buf, format="png")
         buf.seek(0)
+        plt.close(fig)
         return fig, buf
 
     if len(counts) > max_bars:
@@ -297,6 +299,7 @@ def plot_bar_chart(df: pd.DataFrame, column: str, max_bars: int = 20, **kwargs):
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
+    plt.close(fig)
     return fig, buf
 
 # Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
@@ -316,6 +319,7 @@ def plot_pie_chart(df: pd.DataFrame, column: str, max_slices: int = 10):
         buf = io.BytesIO()
         fig.savefig(buf, format="png")
         buf.seek(0)
+        plt.close(fig)
         return fig, buf
 
     # If there are more categories than max_slices, keep only the top categories and group the rest
@@ -340,6 +344,7 @@ def plot_pie_chart(df: pd.DataFrame, column: str, max_slices: int = 10):
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
+    plt.close(fig)
     return fig, buf
 
 # Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
@@ -357,6 +362,7 @@ def plot_box_plot(df: pd.DataFrame, column: str):
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
+    plt.close(fig)
     return fig, buf
 
 # Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
@@ -379,6 +385,7 @@ def plot_correlation_heatmap(df: pd.DataFrame):
     buf = io.BytesIO()
     fig.savefig(buf, format="png")
     buf.seek(0)
+    plt.close(fig)
     return fig, buf
 
 # Caching removed: function performs Streamlit UI calls and returns a figure
@@ -605,9 +612,12 @@ def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
             return
 
         with st.spinner("Generating outlier pair plot..."):
-            fig = sns.pairplot(plot_df[cols_for_pairplot], hue='is_outlier', palette={'Normal': 'blue', 'Outlier': 'red'}, corner=True)
-            st.pyplot(fig)
-
+                pairgrid = sns.pairplot(plot_df[cols_for_pairplot], hue='is_outlier', palette={'Normal': 'blue', 'Outlier': 'red'}, corner=True)
+                st.pyplot(pairgrid.fig)
+                try:
+                    plt.close(pairgrid.fig)
+                except Exception:
+                    pass
         # Dynamic Interpretation Logic
         outlier_df_subset = plot_df[plot_df['is_outlier'] == 'Outlier']
         normal_df_subset = plot_df[plot_df['is_outlier'] == 'Normal']

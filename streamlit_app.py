@@ -20,6 +20,12 @@ import exploratory_data_analysis as eda # Import the new EDA module
 import time_series_analysis as tsa # Import the new time-series module
 import warnings
 
+# Disable Streamlit file watcher to avoid inotify instance exhaustion on constrained hosts
+try:
+    st.set_option('server.fileWatcherType', 'none')
+except Exception:
+    pass
+
 # Suppress warnings for a cleaner output
 warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
 
@@ -273,25 +279,93 @@ def main():
                         numeric_cols = df.select_dtypes(include=np.number).columns
                         for col in numeric_cols:
                             with st.expander(f"Analysis for '{col}'"):
-                                hist_fig, hist_buf = be.plot_histogram(df, col)
-                                st.pyplot(hist_fig)
-                                st.download_button("Download Histogram", hist_buf, f"histogram_{col}.png", "image/png")
+                                hist_res = be.plot_histogram(df, col)
+                                if hist_res is None:
+                                    st.info("No histogram available for this column.")
+                                elif isinstance(hist_res, tuple) and len(hist_res) == 2:
+                                    hist_fig, hist_buf = hist_res
+                                    st.pyplot(hist_fig)
+                                    if hist_buf:
+                                        st.download_button("Download Histogram", hist_buf, f"histogram_{col}.png", "image/png")
+                                    try:
+                                        plt.close(hist_fig)
+                                    except Exception:
+                                        pass
+                                else:
+                                    hist_fig = hist_res
+                                    st.plotly_chart(hist_fig, use_container_width=True)
+                                    try:
+                                        img_bytes = hist_fig.to_image(format="png")
+                                        st.download_button("Download Histogram", img_bytes, f"histogram_{col}.png", "image/png")
+                                    except Exception:
+                                        st.info("PNG download unavailable (install 'kaleido' to enable).")
 
-                                box_fig, box_buf = be.plot_box_plot(df, col)
-                                st.pyplot(box_fig)
-                                st.download_button("Download Box Plot", box_buf, f"boxplot_{col}.png", "image/png")
+                                box_res = be.plot_box_plot(df, col)
+                                if box_res is None:
+                                    st.info("No box plot available for this column.")
+                                elif isinstance(box_res, tuple) and len(box_res) == 2:
+                                    box_fig, box_buf = box_res
+                                    st.pyplot(box_fig)
+                                    if box_buf:
+                                        st.download_button("Download Box Plot", box_buf, f"boxplot_{col}.png", "image/png")
+                                    try:
+                                        plt.close(box_fig)
+                                    except Exception:
+                                        pass
+                                else:
+                                    box_fig = box_res
+                                    st.plotly_chart(box_fig, use_container_width=True)
+                                    try:
+                                        img_bytes = box_fig.to_image(format="png")
+                                        st.download_button("Download Box Plot", img_bytes, f"boxplot_{col}.png", "image/png")
+                                    except Exception:
+                                        st.info("PNG download unavailable (install 'kaleido' to enable).")
 
                         st.subheader("Analysis of Categorical Columns")
                         categorical_cols = df.select_dtypes(include=['object', 'category']).columns
                         for col in categorical_cols:
                             with st.expander(f"Analysis for '{col}'"):
-                                bar_fig, bar_buf = be.plot_bar_chart(df, col)
-                                st.pyplot(bar_fig)
-                                st.download_button("Download Bar Chart", bar_buf, f"barchart_{col}.png", "image/png")
+                                bar_res = be.plot_bar_chart(df, col)
+                                if bar_res is None:
+                                    st.info("No bar chart available for this column.")
+                                elif isinstance(bar_res, tuple) and len(bar_res) == 2:
+                                    bar_fig, bar_buf = bar_res
+                                    st.pyplot(bar_fig)
+                                    if bar_buf:
+                                        st.download_button("Download Bar Chart", bar_buf, f"barchart_{col}.png", "image/png")
+                                    try:
+                                        plt.close(bar_fig)
+                                    except Exception:
+                                        pass
+                                else:
+                                    bar_fig = bar_res
+                                    st.plotly_chart(bar_fig, use_container_width=True)
+                                    try:
+                                        img_bytes = bar_fig.to_image(format="png")
+                                        st.download_button("Download Bar Chart", img_bytes, f"barchart_{col}.png", "image/png")
+                                    except Exception:
+                                        st.info("PNG download unavailable (install 'kaleido' to enable).")
 
-                                pie_fig, pie_buf = be.plot_pie_chart(df, col)
-                                st.pyplot(pie_fig)
-                                st.download_button("Download Pie Chart", pie_buf, f"piechart_{col}.png", "image/png")
+                                pie_res = be.plot_pie_chart(df, col)
+                                if pie_res is None:
+                                    st.info("No pie chart available for this column.")
+                                elif isinstance(pie_res, tuple) and len(pie_res) == 2:
+                                    pie_fig, pie_buf = pie_res
+                                    st.pyplot(pie_fig)
+                                    if pie_buf:
+                                        st.download_button("Download Pie Chart", pie_buf, f"piechart_{col}.png", "image/png")
+                                    try:
+                                        plt.close(pie_fig)
+                                    except Exception:
+                                        pass
+                                else:
+                                    pie_fig = pie_res
+                                    st.plotly_chart(pie_fig, use_container_width=True)
+                                    try:
+                                        img_bytes = pie_fig.to_image(format="png")
+                                        st.download_button("Download Pie Chart", img_bytes, f"piechart_{col}.png", "image/png")
+                                    except Exception:
+                                        st.info("PNG download unavailable (install 'kaleido' to enable).")
 
             elif analysis_type == "Multivariate Analysis":
                 be.print_header("Multivariate Analysis (Multiple Variables)")

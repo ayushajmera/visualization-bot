@@ -97,7 +97,10 @@ def perform_time_series_analysis(df, be):
                 ax4.set_ylabel('Residual')
                 plt.tight_layout()
                 st.pyplot(fig)
-                plt.clf()
+                try:
+                    plt.close(fig)
+                except Exception:
+                    plt.clf()
             except Exception as e:
                 st.error(f"Could not perform seasonal decomposition: {e}")
         else:
@@ -124,4 +127,7 @@ def perform_time_series_analysis(df, be):
         
         plt.tight_layout()
         st.pyplot(fig)
-        plt.clf()
+        try:
+            plt.close(fig)
+        except Exception:
+            plt.clf()

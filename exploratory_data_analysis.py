@@ -34,15 +34,48 @@ def perform_eda(df, be):
 
                 # --- Distribution and Outliers ---
                 st.markdown("##### Distribution Shape & Outliers")
-                hist_fig, hist_buf = be.plot_histogram(df, col)
-                # Display the generated figure for full-width rendering
-                st.pyplot(hist_fig)
-                st.download_button("Download Histogram", hist_buf, f"histogram_{col}.png", "image/png")
+                hist_res = be.plot_histogram(df, col)
+                if hist_res is None:
+                    st.info("No histogram available for this column.")
+                elif isinstance(hist_res, tuple) and len(hist_res) == 2:
+                    hist_fig, hist_buf = hist_res
+                    st.pyplot(hist_fig)
+                    if hist_buf:
+                        st.download_button("Download Histogram", hist_buf, f"histogram_{col}.png", "image/png")
+                    try:
+                        plt.close(hist_fig)
+                    except Exception:
+                        pass
+                else:
+                    # Assume Plotly Figure
+                    hist_fig = hist_res
+                    st.plotly_chart(hist_fig, use_container_width=True)
+                    try:
+                        img_bytes = hist_fig.to_image(format="png")
+                        st.download_button("Download Histogram", img_bytes, f"histogram_{col}.png", "image/png")
+                    except Exception:
+                        st.info("PNG download unavailable (install 'kaleido' to enable).")
 
-                box_fig, box_buf = be.plot_box_plot(df, col)
-                # Display the generated figure for full-width rendering
-                st.pyplot(box_fig)
-                st.download_button("Download Box Plot", box_buf, f"boxplot_{col}.png", "image/png")
+                box_res = be.plot_box_plot(df, col)
+                if box_res is None:
+                    st.info("No box plot available for this column.")
+                elif isinstance(box_res, tuple) and len(box_res) == 2:
+                    box_fig, box_buf = box_res
+                    st.pyplot(box_fig)
+                    if box_buf:
+                        st.download_button("Download Box Plot", box_buf, f"boxplot_{col}.png", "image/png")
+                    try:
+                        plt.close(box_fig)
+                    except Exception:
+                        pass
+                else:
+                    box_fig = box_res
+                    st.plotly_chart(box_fig, use_container_width=True)
+                    try:
+                        img_bytes = box_fig.to_image(format="png")
+                        st.download_button("Download Box Plot", img_bytes, f"boxplot_{col}.png", "image/png")
+                    except Exception:
+                        st.info("PNG download unavailable (install 'kaleido' to enable).")
 
             else: # Categorical
                 st.markdown("#### Categorical Column Analysis")
@@ -66,10 +99,26 @@ def perform_eda(df, be):
                         help="Limit the number of bars so the chart remains readable.",
                         key=f"max_bar_slices_{idx}_{col}"
                     )
-                    bar_fig, bar_buf = be.plot_bar_chart(df, col, max_bars=max_bars)
-                    # Display the generated figure for full-width rendering
-                    st.pyplot(bar_fig)
-                    st.download_button("Download Bar Chart", bar_buf, f"barchart_{col}.png", "image/png")
+                    bar_res = be.plot_bar_chart(df, col, max_bars=max_bars)
+                    if bar_res is None:
+                        st.info("No bar chart available for this column.")
+                    elif isinstance(bar_res, tuple) and len(bar_res) == 2:
+                        bar_fig, bar_buf = bar_res
+                        st.pyplot(bar_fig)
+                        if bar_buf:
+                            st.download_button("Download Bar Chart", bar_buf, f"barchart_{col}.png", "image/png")
+                        try:
+                            plt.close(bar_fig)
+                        except Exception:
+                            pass
+                    else:
+                        bar_fig = bar_res
+                        st.plotly_chart(bar_fig, use_container_width=True)
+                        try:
+                            img_bytes = bar_fig.to_image(format="png")
+                            st.download_button("Download Bar Chart", img_bytes, f"barchart_{col}.png", "image/png")
+                        except Exception:
+                            st.info("PNG download unavailable (install 'kaleido' to enable).")
 
                     st.markdown("###### Pie Chart")
                     # Allow the user to control how many slices to show in the pie chart. Categories beyond this are grouped into 'Other'.
@@ -79,10 +128,26 @@ def perform_eda(df, be):
                         help="Limit the number of slices so the pie remains readable.",
                         key=f"max_pie_slices_{idx}_{col}"
                     )
-                    pie_fig, pie_buf = be.plot_pie_chart(df, col, max_slices=max_slices)
-                    # Display the generated figure for full-width rendering
-                    st.pyplot(pie_fig)
-                    st.download_button("Download Pie Chart", pie_buf, f"piechart_{col}.png", "image/png")
+                    pie_res = be.plot_pie_chart(df, col, max_slices=max_slices)
+                    if pie_res is None:
+                        st.info("No pie chart available for this column.")
+                    elif isinstance(pie_res, tuple) and len(pie_res) == 2:
+                        pie_fig, pie_buf = pie_res
+                        st.pyplot(pie_fig)
+                        if pie_buf:
+                            st.download_button("Download Pie Chart", pie_buf, f"piechart_{col}.png", "image/png")
+                        try:
+                            plt.close(pie_fig)
+                        except Exception:
+                            pass
+                    else:
+                        pie_fig = pie_res
+                        st.plotly_chart(pie_fig, use_container_width=True)
+                        try:
+                            img_bytes = pie_fig.to_image(format="png")
+                            st.download_button("Download Pie Chart", img_bytes, f"piechart_{col}.png", "image/png")
+                        except Exception:
+                            st.info("PNG download unavailable (install 'kaleido' to enable).")
                 else:
                     st.info("This column contains no data to analyze.")
 
@@ -97,11 +162,26 @@ def perform_eda(df, be):
     with st.expander("Numeric vs. Numeric Analysis"):
         st.markdown("#### Correlation Heatmap")
         st.write("The heatmap below shows the linear correlation between all numeric variables. Values close to 1 (red) or -1 (blue) indicate a strong relationship.")
-        heatmap_fig, heatmap_buf = be.plot_correlation_heatmap(df)
-        if heatmap_fig:
-            # Display the generated figure for full-width rendering
+        heatmap_res = be.plot_correlation_heatmap(df)
+        if heatmap_res is None:
+            st.info("No correlation heatmap available for this dataset.")
+        elif isinstance(heatmap_res, tuple) and len(heatmap_res) == 2:
+            heatmap_fig, heatmap_buf = heatmap_res
             st.pyplot(heatmap_fig)
-            st.download_button("Download Heatmap", heatmap_buf, "correlation_heatmap.png", "image/png")
+            if heatmap_buf:
+                st.download_button("Download Heatmap", heatmap_buf, "correlation_heatmap.png", "image/png")
+            try:
+                plt.close(heatmap_fig)
+            except Exception:
+                pass
+        else:
+            heatmap_fig = heatmap_res
+            st.plotly_chart(heatmap_fig, use_container_width=True)
+            try:
+                img_bytes = heatmap_fig.to_image(format="png")
+                st.download_button("Download Heatmap", img_bytes, "correlation_heatmap.png", "image/png")
+            except Exception:
+                st.info("PNG download unavailable (install 'kaleido' to enable).")
 
         if len(numeric_cols) >= 2:
             st.markdown("#### Most Correlated Variable Pairs")
@@ -143,11 +223,26 @@ def perform_eda(df, be):
                 st.write(f"Showing distribution of numeric variables across categories of **`{cat_col}`**.")
                 for num_col in numeric_cols[:3]: # Limit to first 3 numeric cols for brevity
                     st.markdown(f"##### `{num_col}` across `{cat_col}` categories")
-                    cat_box_fig, cat_box_buf = be.plot_categorical_boxplot(df, cat_col, num_col)
-                    if cat_box_fig:
-                        # Display the generated figure for full-width rendering
+                    cat_box_res = be.plot_categorical_boxplot(df, cat_col, num_col)
+                    if cat_box_res is None:
+                        st.info("No categorical boxplot available for this pair.")
+                    elif isinstance(cat_box_res, tuple) and len(cat_box_res) == 2:
+                        cat_box_fig, cat_box_buf = cat_box_res
                         st.pyplot(cat_box_fig)
-                        st.download_button(f"Download {num_col} vs {cat_col} Plot", cat_box_buf, f"cat_boxplot_{num_col}_{cat_col}.png", "image/png")
+                        if cat_box_buf:
+                            st.download_button(f"Download {num_col} vs {cat_col} Plot", cat_box_buf, f"cat_boxplot_{num_col}_{cat_col}.png", "image/png")
+                        try:
+                            plt.close(cat_box_fig)
+                        except Exception:
+                            pass
+                    else:
+                        cat_box_fig = cat_box_res
+                        st.plotly_chart(cat_box_fig, use_container_width=True)
+                        try:
+                            img_bytes = cat_box_fig.to_image(format="png")
+                            st.download_button(f"Download {num_col} vs {cat_col} Plot", img_bytes, f"cat_boxplot_{num_col}_{cat_col}.png", "image/png")
+                        except Exception:
+                            st.info("PNG download unavailable (install 'kaleido' to enable).")
         else:
             st.info("Not enough numeric and categorical columns to perform this analysis.")
 

@@ -79,6 +79,10 @@ def perform_audit(df, be):
                 sns.heatmap(df.isnull(), cbar=False, yticklabels=False, cmap='viridis', ax=ax)
                 ax.set_title("Missing Values Heatmap")
                 st.pyplot(fig)
+                try:
+                    plt.close(fig)
+                except Exception:
+                    pass
 
     # --- 2. Duplicates ---
     with st.expander("Duplicate Data Analysis", expanded=True):
