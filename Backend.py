@@ -187,7 +187,7 @@ def detect_anomalies(series: pd.Series) -> dict:
     
     return outliers
 
-@st.cache_resource(show_spinner="Generating histogram...")
+# Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
 def plot_histogram(df: pd.DataFrame, column: str, outliers_to_plot: list | None = None, outliers_summary_count: int | None = None):
     """Generates and saves a histogram, highlighting outliers if provided.
 
@@ -237,7 +237,7 @@ def plot_histogram(df: pd.DataFrame, column: str, outliers_to_plot: list | None 
     buf.seek(0)
     return fig, buf
 
-@st.cache_resource(show_spinner="Generating bar chart...")
+# Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
 def plot_bar_chart(df: pd.DataFrame, column: str, max_bars: int = 20, **kwargs): 
     """Generates and saves a bar chart for a categorical column.
 
@@ -299,7 +299,7 @@ def plot_bar_chart(df: pd.DataFrame, column: str, max_bars: int = 20, **kwargs):
     buf.seek(0)
     return fig, buf
 
-@st.cache_resource(show_spinner="Generating pie chart...")
+# Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
 def plot_pie_chart(df: pd.DataFrame, column: str, max_slices: int = 10):
     """Generates and saves a pie chart for a categorical column.
 
@@ -342,7 +342,7 @@ def plot_pie_chart(df: pd.DataFrame, column: str, max_slices: int = 10):
     buf.seek(0)
     return fig, buf
 
-@st.cache_resource(show_spinner="Generating box plot...")
+# Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
 def plot_box_plot(df: pd.DataFrame, column: str):
     """Generates and saves a box plot for a numeric column."""
     fig, ax = plt.subplots(figsize=(12, 7))
@@ -359,7 +359,7 @@ def plot_box_plot(df: pd.DataFrame, column: str):
     buf.seek(0)
     return fig, buf
 
-@st.cache_resource(show_spinner="Generating correlation heatmap...")
+# Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
 def plot_correlation_heatmap(df: pd.DataFrame):
     """Calculates and plots the correlation heatmap for numeric columns."""
     numeric_df = df.select_dtypes(include=np.number)
@@ -381,7 +381,7 @@ def plot_correlation_heatmap(df: pd.DataFrame):
     buf.seek(0)
     return fig, buf
 
-@st.cache_data(show_spinner="Generating scatter plot...")
+# Caching removed: function performs Streamlit UI calls and returns a figure
 def plot_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str):
     """Generates an interactive scatter plot for two numeric columns."""
     fig = px.scatter(df, x=x_col, y=y_col, title=f'Scatter Plot: {y_col} vs. {x_col}',
@@ -400,7 +400,7 @@ def plot_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str):
     # Note: Do not render the chart here; return the Plotly Figure for the caller to display.
     return fig
 
-@st.cache_resource(show_spinner="Generating pair plot...")
+# Caching removed: returns a seaborn PairGrid which is not serializable
 def plot_pair_plot(df: pd.DataFrame):
     """Generates a pair plot for numeric columns."""
     numeric_df = df.select_dtypes(include=np.number)
@@ -422,7 +422,7 @@ def plot_pair_plot(df: pd.DataFrame):
     # Pairplot returns a Figure object, not a buffer directly. We handle it in the UI.
     return fig
 
-@st.cache_resource(show_spinner="Generating categorical box plot...")
+# Caching removed: function returns matplotlib Figure/BytesIO and has UI side-effects
 def plot_categorical_boxplot(df: pd.DataFrame, cat_col: str, num_col: str):
     """Generates a box plot of a numeric column grouped by a categorical column."""
     # This function does not need a print_header as it's part of a larger section.
@@ -445,7 +445,7 @@ def plot_categorical_boxplot(df: pd.DataFrame, cat_col: str, num_col: str):
     buf.seek(0)
     return fig, buf
 
-@st.cache_data(show_spinner="Generating time series plot...")
+# Caching removed: function performs Streamlit UI actions and displays the figure
 def plot_time_series(df: pd.DataFrame, time_col: str, value_col: str):
     """Generates an interactive time series plot."""
     print_header(f"Generating Time Series Plot: '{value_col}' over '{time_col}'")
@@ -528,7 +528,7 @@ def scale_features(df: pd.DataFrame, columns_to_scale: list, scaler_type: str) -
     
     return df_processed
 
-@st.cache_data(show_spinner="Generating 3D scatter plot...")
+# Caching removed: function performs Streamlit UI actions and displays the figure
 def plot_3d_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str, z_col: str, color_col: str | None = None):
     """Generates an interactive 3D scatter plot."""
     print_header(f"Generating 3D Scatter Plot: '{x_col}' vs '{y_col}' vs '{z_col}'")
@@ -556,7 +556,7 @@ def plot_3d_scatter_plot(df: pd.DataFrame, x_col: str, y_col: str, z_col: str, c
     st.markdown(description)
     st.plotly_chart(fig, width='stretch')
 
-@st.cache_resource(show_spinner="Generating outlier pair plot...")
+# Caching removed: function is UI-heavy and returns non-serializable plot objects
 def plot_outlier_analysis(df: pd.DataFrame, column: str, outliers: list):
     """Creates a pair plot that highlights outlier data points to analyze their relationships with other variables."""
     if not outliers:
@@ -748,7 +748,7 @@ def correct_data_type(df: pd.DataFrame, column: str, target_type: str) -> pd.Dat
 
     return df_processed
 
-@st.cache_data(show_spinner="Standardizing categories...")
+# Caching removed: function performs UI side-effects (calls st.success)
 def standardize_categories(df: pd.DataFrame, column: str, values_to_merge: list, new_value: str) -> pd.DataFrame:
     """Standardizes categories by merging multiple values into a single new value."""
     df_processed = df.copy()
@@ -766,7 +766,7 @@ def standardize_categories(df: pd.DataFrame, column: str, values_to_merge: list,
 
     return df_processed
 
-@st.cache_data(show_spinner="Creating derived numeric column...")
+# Caching removed: function performs UI side-effects (calls st.success)
 def create_derived_column_numeric(df: pd.DataFrame, col_a: str, operation: str, col_b: str, new_col_name: str) -> pd.DataFrame:
     """Creates a new column by performing an operation on two numeric columns."""
     df_processed = df.copy()
@@ -793,7 +793,7 @@ def create_derived_column_numeric(df: pd.DataFrame, col_a: str, operation: str, 
 
     return df_processed
 
-@st.cache_data(show_spinner="Extracting datetime features...")
+# Caching removed: function performs UI side-effects (calls st.success)
 def create_derived_column_datetime(df: pd.DataFrame, time_col: str, parts_to_extract: list) -> pd.DataFrame:
     """Creates new columns by extracting parts from a datetime column."""
     df_processed = df.copy()
@@ -826,7 +826,7 @@ def create_derived_column_datetime(df: pd.DataFrame, time_col: str, parts_to_ext
 
     return df_processed
 
-@st.cache_data(show_spinner="Creating binned column...")
+# Caching removed: function performs UI side-effects (calls st.success)
 def create_binned_column(df: pd.DataFrame, col_to_bin: str, num_bins: int, new_col_name: str) -> pd.DataFrame:
     """Creates a new categorical column by binning a numeric column."""
     df_processed = df.copy()
@@ -844,7 +844,7 @@ def create_binned_column(df: pd.DataFrame, col_to_bin: str, num_bins: int, new_c
 
     return df_processed
 
-@st.cache_data(show_spinner="Generating grouped analysis...")
+# Caching removed: function performs UI actions and displays figures
 def plot_grouped_analysis(df: pd.DataFrame):
     """
     Performs grouped analysis by plotting the mean of numeric columns against top categories of a categorical column.
@@ -887,7 +887,7 @@ def plot_grouped_analysis(df: pd.DataFrame):
             except Exception as e:
                 st.error(f"Could not generate grouped plot for '{num_col}': {e}")
 
-@st.cache_data(show_spinner="Generating faceted scatter plot...")
+# Caching removed: function performs UI actions and displays figures
 def plot_faceted_scatter(df: pd.DataFrame):
     """
     Generates a faceted scatter plot to show the relationship between two numeric variables across different categories.
