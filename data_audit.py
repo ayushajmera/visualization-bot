@@ -5,6 +5,7 @@ import streamlit as st
 import pandas as pd
 import seaborn as sns
 import numpy as np
+import plotly.express as px
 import matplotlib.pyplot as plt
 
 def _check_categorical_consistency(df, col):
@@ -65,10 +66,19 @@ def perform_audit(df, be):
 
             st.markdown("#### Is missing data random or systematic?")
             st.write("The heatmap below visualizes the distribution of missing values. Patterns (like vertical or horizontal bands) can indicate systematic issues.")
-            fig, ax = plt.subplots(figsize=(12, 6))
-            sns.heatmap(df.isnull(), cbar=False, yticklabels=False, cmap='viridis', ax=ax)
-            ax.set_title("Missing Values Heatmap")
-            st.pyplot(fig)
+            # Convert boolean missing map to int for plotting and transpose so columns are on the Y axis for readability
+            try:
+                missing_map = df.isnull().T.astype(int)
+                fig = px.imshow(missing_map, color_continuous_scale='Viridis', aspect='auto', title='Missing Values Heatmap')
+                fig.update_layout(xaxis={'showticklabels': False}, yaxis={'tickangle': 0})
+                st.plotly_chart(fig, use_container_width=True)
+            except Exception as e:
+                st.error(f"Could not render missing values heatmap: {e}")
+                # Fallback to matplotlib
+                fig, ax = plt.subplots(figsize=(12, 6))
+                sns.heatmap(df.isnull(), cbar=False, yticklabels=False, cmap='viridis', ax=ax)
+                ax.set_title("Missing Values Heatmap")
+                st.pyplot(fig)
 
     # --- 2. Duplicates ---
     with st.expander("Duplicate Data Analysis", expanded=True):
